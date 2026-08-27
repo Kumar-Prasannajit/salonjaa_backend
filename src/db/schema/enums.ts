@@ -1,0 +1,66 @@
+import { pgEnum } from "drizzle-orm/pg-core";
+
+// Identity
+export const userStatusEnum = pgEnum("user_status", ["ACTIVE", "INACTIVE", "SUSPENDED"]);
+export const userGenderEnum = pgEnum("user_gender", ["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"]);
+export const roleTypeEnum = pgEnum("role_type", ["CUSTOMER", "SALON_OWNER", "ADMIN"]);
+export const kycStatusEnum = pgEnum("kyc_status", ["PENDING", "APPROVED", "REJECTED"]);
+
+// Salon / branch / staff / service
+export const salonStatusEnum = pgEnum("salon_status", ["ACTIVE", "INACTIVE", "SUSPENDED"]);
+export const verificationStatusEnum = pgEnum("verification_status", ["PENDING", "VERIFIED", "REJECTED"]);
+export const branchStatusEnum = pgEnum("branch_status", ["ACTIVE", "INACTIVE", "CLOSED"]);
+export const staffTypeEnum = pgEnum("staff_type", ["NORMAL", "STAR"]);
+export const staffStatusEnum = pgEnum("staff_status", ["ACTIVE", "INACTIVE"]);
+export const leaveStatusEnum = pgEnum("leave_status", ["APPROVED", "CANCELLED"]);
+export const serviceStatusEnum = pgEnum("service_status", ["ACTIVE", "INACTIVE"]);
+
+// Booking
+export const bookingTypeEnum = pgEnum("booking_type", ["ONLINE", "WALK_IN"]);
+export const bookingStatusEnum = pgEnum("booking_status", [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "EXPIRED",
+  "CANCELLED",
+  "COMPLETED",
+  "REFUND_PENDING",
+  "REFUNDED",
+  "NO_SHOW",
+]);
+export const rescheduleRequestStatusEnum = pgEnum("reschedule_request_status", ["PENDING", "ACCEPTED", "REJECTED"]);
+export const requestedByEnum = pgEnum("requested_by", ["CUSTOMER", "SALON"]);
+export const strikeTypeEnum = pgEnum("strike_type", ["FAKE_BOOKING", "NO_SHOW", "ABUSIVE_CANCELLATION"]);
+
+// Payment / coupon / settlement
+export const paymentMethodEnum = pgEnum("payment_method", ["ONLINE", "PAY_AT_SALON"]);
+export const paymentProviderEnum = pgEnum("payment_provider", ["NONE", "RAZORPAY", "CASHFREE"]);
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "PENDING",
+  "SUCCESS",
+  "FAILED",
+  "REFUNDED",
+  "PARTIALLY_REFUNDED",
+]);
+export const refundStatusEnum = pgEnum("refund_status", ["PENDING", "APPROVED", "PROCESSING", "COMPLETED", "REJECTED"]);
+export const couponTypeEnum = pgEnum("coupon_type", ["FIXED", "PERCENTAGE"]);
+export const settlementStatusEnum = pgEnum("settlement_status", ["PENDING", "PROCESSING", "COMPLETED"]);
+
+// Notification / OTP
+export const notificationTypeEnum = pgEnum("notification_type", ["EMAIL", "SMS", "WHATSAPP", "IN_APP"]);
+export const notificationStatusEnum = pgEnum("notification_status", ["PENDING", "SENT", "FAILED", "READ"]);
+export const otpPurposeEnum = pgEnum("otp_purpose", ["LOGIN", "REGISTER", "VERIFY_EMAIL", "BOOKING_CHECKIN"]);
+export const otpStatusEnum = pgEnum("otp_status", ["ACTIVE", "VERIFIED", "EXPIRED"]);
+
+// Review / complaint / admin
+export const reviewReportStatusEnum = pgEnum("review_report_status", ["PENDING", "APPROVED", "REJECTED"]);
+export const complaintTypeEnum = pgEnum("complaint_type", ["BOOKING", "PAYMENT", "SALON", "STAFF", "REFUND", "OTHER"]);
+export const complaintStatusEnum = pgEnum("complaint_status", ["OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"]);
+export const adminActionTypeEnum = pgEnum("admin_action_type", [
+  "APPROVE",
+  "REJECT",
+  "SUSPEND",
+  "REMOVE_STRIKE",
+  "REFUND",
+  "EDIT",
+]);

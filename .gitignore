@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs and coverage
+*.log
+logs/
+coverage/
+
+# Tooling and editor files
+.cache/
+.eslintcache
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
