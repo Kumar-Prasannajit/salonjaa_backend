@@ -17,6 +17,7 @@ Status as of last session. Update this file whenever a module ships or a decisio
 - **Deferred:** `GET /users/me/bookings` — depends on the `bookings` table, which belongs to the Booking module (not built). Don't stub this early; wire it up when Booking ships.
 
 ### Module 3 — Salon + Branch
+- Migration `0002_lush_frightful_four.sql` (salon_owner_profiles, salons, branches, branch_holidays, branch_capacity_rules)
 - `POST/GET /api/v1/salons`, `GET/PATCH/DELETE /api/v1/salons/:salonId` — all require `SALON_OWNER` role
 - `POST /api/v1/branches` (needs `salonId`), `GET/PATCH /api/v1/branches/:id`, `GET /api/v1/branches?salonId=`
 - `POST /api/v1/branches/:id/holidays`, `DELETE /api/v1/branches/:id/holidays/:holidayId`
