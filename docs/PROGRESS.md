@@ -9,6 +9,7 @@ Status as of last session. Update this file whenever a module ships or a decisio
 - `POST /api/v1/auth/verify-otp` — `{ email, otp }` → `{ success, accessToken, refreshToken, user }`. First verify for an email auto-creates the user as role `CUSTOMER`.
 - `POST /api/v1/auth/refresh-token` — `{ refreshToken }` → `{ accessToken }` (no `success` key — non-standard shape, intentional, matches frontend_handover.md exactly)
 - `POST /api/v1/auth/logout` — auth required, `{ refreshToken }` → `{ success }`
+- Migration `0000_shocking_maginty.sql` also created `notifications` and `notification_templates` (TRD §11 Notification Design) and `audit_logs` (TRD §12 Security Design). `notifications` is actively used today — the OTP provider inserts a row per send and updates it to `SENT`/`FAILED` for delivery tracking. `notification_templates` and `audit_logs` are schema only, no consumers yet: `notification_templates` is reserved for the Notification module (Development Order step 8), `audit_logs` for audit logging (Development Order steps 1 and 9).
 
 ### Module 2 — User + Address
 - `GET /api/v1/users/me` → `{ id, name, email, phone, gender, dob, profileImage }` — **field is `name`, not `fullName`**, per frontend_handover.md's documented contract (differs from the PATCH request body field below — intentional, not a bug)
@@ -33,7 +34,7 @@ Status as of last session. Update this file whenever a module ships or a decisio
 Backend stores plain `latitude`/`longitude` numeric columns only. No Google Maps dependency anywhere in the backend. `navigator.geolocation` (free, built into browsers) is what the frontend uses for "find near me." Nearby-branch search will be plain Haversine math or Postgres `earthdistance`, built when the Availability/Search module is built — not yet implemented.
 
 ## Not started yet
-Staff, Service Category, Service, Availability, Booking, Payment, Coupon, Review, Admin. Follow `## 14. Development Order` in `docs/TRD.md` for the intended sequence — do not jump ahead to Booking/Payment before Staff/Service/Availability exist, since Booking depends on all of them.
+Staff, Service Category, Service, Availability, Booking, Payment, Coupon, Review, Notification, Admin. Follow `## 14. Development Order` in `docs/TRD.md` for the intended sequence — do not jump ahead to Booking/Payment before Staff/Service/Availability exist, since Booking depends on all of them.
 
 ## Delivery workflow in use
 Each module is a separate git commit. Work is handed to the user as `git format-patch` output (`000N-description.patch`), applied on their machine with `git am`. Keep committing one module = one commit so this keeps working.
