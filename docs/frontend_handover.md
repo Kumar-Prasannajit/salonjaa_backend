@@ -2,7 +2,24 @@
 
 Base URL: `/api/v1`. Send `Authorization: Bearer <accessToken>` on authenticated requests. Responses beyond the explicitly supplied examples are not finalized in the API Inventory; consume the shown fields only and handle standard `400`, `401`, `403`, `404`, `409`, `422`, `429`, and `500` failures where applicable.
 
-## Auth
+## Backend build status
+
+This whole document describes the target contract. Only the sections marked **🟢 Live** are actually built, running, and Postman-tested today — build frontend against those first. Everything marked **⚪ Not built** is contract-only: the endpoint doesn't exist on the server yet and calling it will 404. Check `docs/PROGRESS.md` in the backend repo for the current source of truth before starting frontend work on a section, in case this has moved on since you last pulled.
+
+| Section below | Backend module | Status |
+|---|---|---|
+| Auth | Module 1 — Foundation + Auth | 🟢 Live |
+| User and Address | Module 2 — User + Address | 🟢 Live (except `GET /users/me/bookings` — see note under that endpoint) |
+| Salon and Branch | Module 3 — Salon + Branch | 🟢 Live |
+| Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
+| Availability and Booking | Availability, Booking (not started) | ⚪ Not built |
+| Payment and Coupon | Payment, Coupon (not started) | ⚪ Not built |
+| Reviews | Review (not started) | ⚪ Not built |
+| Admin | Admin (not started) | ⚪ Not built |
+
+A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist for the 🟢 Live sections only, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo.
+
+## Auth — 🟢 Live (Module 1 — Foundation + Auth)
 
 ### POST /auth/send-otp
 
@@ -20,7 +37,7 @@ Purpose: Issue a new access token. Authentication: Public. Body: `{ "refreshToke
 
 Purpose: Invalidate the presented refresh-token session. Authentication: Authenticated. Body/query/path: none. Success: `{ "success": true }`. Errors: `401`, `500`. Frontend: clear local session regardless of successful server acknowledgement.
 
-## User and Address
+## User and Address — 🟢 Live (Module 2 — User + Address)
 
 ### GET /users/me
 
@@ -34,11 +51,11 @@ Purpose: Update profile. Authentication: Authenticated. Body: `{ "fullName": "",
 
 Purpose: Create, list, update, and delete only the current user’s addresses. Authentication: Authenticated. Body/query/path: `id` is required for PATCH/DELETE; field contract is not supplied. Validation: owned address, address fields per backend schema. Success/error contract: not supplied. Errors: `400`, `401`, `403`, `404`, `500`. Frontend: use list skeleton; show “no saved addresses” empty state; disable address action while mutation runs.
 
-### GET /users/me/bookings
+### GET /users/me/bookings — ⚪ Not built
 
-Purpose: Customer booking history. Authentication: Authenticated. Query: `status=COMPLETED|CANCELLED|UPCOMING` (inventory values). Success/error contract: not supplied. Errors: `401`, `500`. Frontend: filter loading state; show empty history per selected status.
+Purpose: Customer booking history. Authentication: Authenticated. Query: `status=COMPLETED|CANCELLED|UPCOMING` (inventory values). Success/error contract: not supplied. Errors: `401`, `500`. Frontend: filter loading state; show empty history per selected status. **Backend note:** deferred — depends on the `bookings` table, which belongs to the not-yet-built Booking module. Don't build this screen until it's live.
 
-## Salon and Branch
+## Salon and Branch — 🟢 Live (Module 3 — Salon + Branch)
 
 ### POST /salons
 
@@ -56,7 +73,7 @@ Purpose: Create/list/get/update branches. Authentication: Salon Owner with ownin
 
 Purpose: Manage branch holiday and capacity override. Authentication: owning Salon Owner. Holiday body: `{ "date":"2026-12-25", "reason":"Christmas" }`; capacity body: `{ "maxCapacityOverride":3 }`. Validation: valid future/operational date; override > 0. Errors: `400`, `401`, `403`, `404`, `500`. Frontend: refresh availability/calendar after successful mutation; show empty holiday state.
 
-## Staff and Services
+## Staff and Services — 🟢 Live (Module 4 — Catalogue + Staff)
 
 ### POST /staff; GET /staff; GET /staff/:id; PATCH /staff/:id; DELETE /staff/:id
 
@@ -74,7 +91,7 @@ Purpose: Create/list/get/update/disable branch services. Authentication: owning 
 
 Purpose: Assign/remove a staff member for a service. Authentication: owning Salon Owner. POST body: `{ "staffId":"" }`; DELETE path has both IDs. Validation: service and staff must belong to same owned branch. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: disable duplicates and refresh available-staff lists.
 
-## Availability and Booking
+## Availability and Booking — ⚪ Not built (Availability, Booking modules not started)
 
 ### GET /availability/slots
 
@@ -108,7 +125,7 @@ Purpose: Salon booking management. Authentication: owning Salon Owner. List quer
 
 Purpose: Explicitly marked **Future Feature — Not MVP** in the supplied API Inventory. Do not call or build a UI for this endpoint.
 
-## Payment and Coupon
+## Payment and Coupon — ⚪ Not built (Payment, Coupon modules not started)
 
 ### POST /payments/create-order; POST /payments/verify
 
@@ -122,7 +139,7 @@ Purpose: Payment/refund/settlement reads and customer refund request. Authentica
 
 Purpose: Validate coupon before booking confirmation. Authentication: Customer. Body `{ "couponCode":"", "bookingAmount":1000 }`. Success `{ "valid":true, "discount":100 }`. Errors: `400`, `401`, `422`, `500`. Frontend: validate on explicit apply, show inline result, never trust client-calculated discount.
 
-## Reviews
+## Reviews — ⚪ Not built (Review module not started)
 
 ### POST /reviews; POST /reviews/:reviewId/images; PATCH /reviews/:reviewId
 
@@ -136,6 +153,6 @@ Purpose: Read review detail/listings. Authentication: not specified; treat as pu
 
 Purpose: Report review or salon-owner reply. Authentication: report Customer or Salon Owner; reply owning Salon Owner. Report body `{ "reason":"" }`; reply body `{ "message":"" }`. Validation: reviewer identity/ownership; response contracts not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirm report, lock reply submit while pending, update thread on success.
 
-## Admin
+## Admin — ⚪ Not built (Admin module not started)
 
 The supplied Admin API Inventory contains no endpoints. Do not implement frontend calls for Admin until its endpoint inventory defines method, path, request, response, and authorization contract.
