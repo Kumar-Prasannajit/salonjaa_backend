@@ -7,3 +7,4 @@ export * from "@/db/schema/salon";
 export * from "@/db/schema/branch";
 export * from "@/db/schema/staff";
 export * from "@/db/schema/service";
+export * from "@/db/schema/booking";

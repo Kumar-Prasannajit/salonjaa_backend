@@ -17,3 +17,13 @@ export type OtpPurpose = (typeof OTP_PURPOSES)[keyof typeof OTP_PURPOSES];
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
+
+// Availability (Module 5): branch_slot_templates has no CRUD endpoint anywhere in the docs
+// (deferred in Module 3), so there's no per-branch way to configure slot granularity. Slots
+// are generated at this fixed interval across the branch's opening->closing window instead.
+export const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
+
+// Booking statuses that reserve branch capacity (TRD context.md booking-engine decisions):
+// "pending and approved bookings reserve availability; rejected, expired, cancelled,
+// refunded, and completed bookings do not."
+export const CAPACITY_CONSUMING_BOOKING_STATUSES = ["PENDING", "APPROVED"] as const;

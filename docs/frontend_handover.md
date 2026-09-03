@@ -12,7 +12,7 @@ This whole document describes the target contract. Only the sections marked **�
 | User and Address | Module 2 — User + Address | 🟢 Live (except `GET /users/me/bookings` — see note under that endpoint) |
 | Salon and Branch | Module 3 — Salon + Branch | 🟢 Live |
 | Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
-| Availability and Booking | Availability, Booking (not started) | ⚪ Not built |
+| Availability and Booking | Module 5 — Availability | 🟡 Partial — `GET /availability/slots` and `GET /availability/staff` are live; everything booking-related below them is not built (Booking module not started) |
 | Payment and Coupon | Payment, Coupon (not started) | ⚪ Not built |
 | Reviews | Review (not started) | ⚪ Not built |
 | Admin | Admin (not started) | ⚪ Not built |
@@ -91,17 +91,17 @@ Purpose: Create/list/get/update/disable branch services. Authentication: owning 
 
 Purpose: Assign/remove a staff member for a service. Authentication: owning Salon Owner. POST body: `{ "staffId":"" }`; DELETE path has both IDs. Validation: service and staff must belong to same owned branch. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: disable duplicates and refresh available-staff lists.
 
-## Availability and Booking — ⚪ Not built (Availability, Booking modules not started)
+## Availability and Booking — 🟡 Partial (Module 5 — Availability is live; Booking below is not built)
 
-### GET /availability/slots
+### GET /availability/slots — 🟢 Live
 
-Purpose: Return available booking start slots. Authentication: Public. Query: `branchId`, `date`, `serviceIds`. Success: `[{ "slotId":"", "startTime":"10:00", "endTime":"11:30", "available":true }]`. Validation: valid active services at branch/date. Errors: `400`, `404`, `500`. Frontend: debounce selection changes, show inline loading, and show “no slots available” empty state.
+Purpose: Return available booking start slots. Authentication: Public. Query: `branchId`, `date`, `serviceIds`. Success: `[{ "slotId":"", "startTime":"10:00", "endTime":"11:30", "available":true }]`. Validation: valid active services at branch/date. Errors: `400`, `404`, `500`. Frontend: debounce selection changes, show inline loading, and show “no slots available” empty state. **Backend notes:** `serviceIds` is **comma-separated** (e.g. `?serviceIds=id1,id2`) — not specified in the original inventory, this is the implementation's chosen convention. `slotId` is a plain `"HH:MM-HH:MM"` string, not a persisted ID — the future `POST /bookings` will need to accept this same format back. Slots are generated at a fixed 30-minute interval (no per-branch template configuration exists yet).
 
-### GET /availability/staff
+### GET /availability/staff — 🟢 Live
 
-Purpose: Return eligible available staff. Authentication: Public. Query: `branchId`, `serviceIds`, `date`. Success: `[{ "staffId":"", "name":"", "type":"NORMAL" }]`. Errors: `400`, `404`, `500`. Frontend: allow “no preference”; show no eligible stylist state.
+Purpose: Return eligible available staff. Authentication: Public. Query: `branchId`, `serviceIds`, `date`. Success: `[{ "staffId":"", "name":"", "type":"NORMAL" }]`. Errors: `400`, `404`, `500`. Frontend: allow “no preference”; show no eligible stylist state. **Backend note:** this is a day-level listing (no time param in the contract) — a staff member appears unless their approved leave covers the *entire* business day. Partial-day leave conflicts are only caught by `GET /availability/slots` and, later, at actual booking creation.
 
-### POST /bookings
+### POST /bookings — ⚪ Not built
 
 Purpose: Create pending customer booking and immediately reserve capacity. Authentication: Customer. Body: `{ "salonId":"salon_123", "branchId":"branch_123", "services":["service_1","service_2"], "staffId":"staff_123", "bookingDate":"2026-10-01", "slotId":"slot_123", "notes":"Optional notes" }`. Validation: staff optional; nonempty services; availability/capacity/stylist checks. Success: `{ "bookingId":"", "status":"PENDING" }`. Errors: `400`, `401`, `403`, `409`, `422`, `500`. Frontend: prevent double submit, refresh slots on conflict, show pending-approval state.
 
