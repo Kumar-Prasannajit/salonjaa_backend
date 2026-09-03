@@ -19,3 +19,11 @@ export function generateNumericOtp(length: number): string {
 export function randomToken(bytes = 32): string {
   return crypto.randomBytes(bytes).toString("hex");
 }
+
+/** Human-facing booking reference, e.g. "SLJ-M1A2B3C4-D5E6F7". Not a DB sequence — timestamp
+ * (base36) + random suffix keeps collision odds negligible without a Postgres sequence. */
+export function generateBookingNumber(): string {
+  const timePart = Date.now().toString(36).toUpperCase();
+  const randomPart = crypto.randomBytes(3).toString("hex").toUpperCase();
+  return `SLJ-${timePart}-${randomPart}`;
+}

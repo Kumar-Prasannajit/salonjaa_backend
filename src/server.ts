@@ -3,6 +3,8 @@ import { env } from "@/config/env";
 import { logger } from "@/shared/logger";
 import { checkDatabaseConnection, closeDatabaseConnection } from "@/config/database";
 import { closeRedisConnection } from "@/config/redis";
+import { startBookingExpiryWorker, stopBookingExpiryWorker } from "@/queues/booking-expiry.worker";
+import { closeBookingExpiryQueue } from "@/queues/booking-expiry.queue";
 
 async function main(): Promise<void> {
   await checkDatabaseConnection();
@@ -13,9 +15,13 @@ async function main(): Promise<void> {
     logger.info(`Salonjaa backend listening on port ${env.PORT} (${env.NODE_ENV})`);
   });
 
+  startBookingExpiryWorker();
+
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
     server.close(async () => {
+      await stopBookingExpiryWorker();
+      await closeBookingExpiryQueue();
       await closeDatabaseConnection();
       await closeRedisConnection();
       process.exit(0);

@@ -11,11 +11,13 @@ export const queueConnection: ConnectionOptions = {
   maxRetriesPerRequest: null,
 };
 
+// BullMQ v5 rejects ":" in queue names (reserved as its own Redis key separator) — use "."
+// instead of the TRD's illustrative "module:action" notation.
 export const QUEUE_NAMES = {
-  NOTIFICATION_SEND: "notification:send",
-  BOOKING_EXPIRE: "booking:expire",
-  BOOKING_CHECKIN_OTP: "booking:checkin-otp",
-  PROMOTION_DEACTIVATE: "promotion:deactivate",
-  PAYMENT_PROVIDER_EVENT: "payment:provider-event",
-  REFUND_PROCESS: "refund:process",
+  NOTIFICATION_SEND: "notification.send",
+  BOOKING_EXPIRE: "booking.expire",
+  BOOKING_CHECKIN_OTP: "booking.checkin-otp",
+  PROMOTION_DEACTIVATE: "promotion.deactivate",
+  PAYMENT_PROVIDER_EVENT: "payment.provider-event",
+  REFUND_PROCESS: "refund.process",
 } as const;

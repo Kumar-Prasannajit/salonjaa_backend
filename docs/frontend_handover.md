@@ -12,7 +12,7 @@ This whole document describes the target contract. Only the sections marked **�
 | User and Address | Module 2 — User + Address | 🟢 Live (except `GET /users/me/bookings` — see note under that endpoint) |
 | Salon and Branch | Module 3 — Salon + Branch | 🟢 Live |
 | Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
-| Availability and Booking | Module 5 — Availability | 🟡 Partial — `GET /availability/slots` and `GET /availability/staff` are live; everything booking-related below them is not built (Booking module not started) |
+| Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
 | Payment and Coupon | Payment, Coupon (not started) | ⚪ Not built |
 | Reviews | Review (not started) | ⚪ Not built |
 | Admin | Admin (not started) | ⚪ Not built |
@@ -91,7 +91,7 @@ Purpose: Create/list/get/update/disable branch services. Authentication: owning 
 
 Purpose: Assign/remove a staff member for a service. Authentication: owning Salon Owner. POST body: `{ "staffId":"" }`; DELETE path has both IDs. Validation: service and staff must belong to same owned branch. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: disable duplicates and refresh available-staff lists.
 
-## Availability and Booking — 🟡 Partial (Module 5 — Availability is live; Booking below is not built)
+## Availability and Booking — 🟢 Live (Module 5 — Availability, Module 6 — Booking)
 
 ### GET /availability/slots — 🟢 Live
 
@@ -101,25 +101,25 @@ Purpose: Return available booking start slots. Authentication: Public. Query: `b
 
 Purpose: Return eligible available staff. Authentication: Public. Query: `branchId`, `serviceIds`, `date`. Success: `[{ "staffId":"", "name":"", "type":"NORMAL" }]`. Errors: `400`, `404`, `500`. Frontend: allow “no preference”; show no eligible stylist state. **Backend note:** this is a day-level listing (no time param in the contract) — a staff member appears unless their approved leave covers the *entire* business day. Partial-day leave conflicts are only caught by `GET /availability/slots` and, later, at actual booking creation.
 
-### POST /bookings — ⚪ Not built
+### POST /bookings — 🟢 Live
 
-Purpose: Create pending customer booking and immediately reserve capacity. Authentication: Customer. Body: `{ "salonId":"salon_123", "branchId":"branch_123", "services":["service_1","service_2"], "staffId":"staff_123", "bookingDate":"2026-10-01", "slotId":"slot_123", "notes":"Optional notes" }`. Validation: staff optional; nonempty services; availability/capacity/stylist checks. Success: `{ "bookingId":"", "status":"PENDING" }`. Errors: `400`, `401`, `403`, `409`, `422`, `500`. Frontend: prevent double submit, refresh slots on conflict, show pending-approval state.
+Purpose: Create pending customer booking and immediately reserve capacity. Authentication: Customer. Body: `{ "salonId":"salon_123", "branchId":"branch_123", "services":["service_1","service_2"], "staffId":"staff_123", "bookingDate":"2026-10-01", "slotId":"slot_123", "notes":"Optional notes" }`. Validation: staff optional; nonempty services; availability/capacity/stylist checks. Success: `{ "bookingId":"", "status":"PENDING" }`. Errors: `400`, `401`, `403`, `409`, `422`, `500`. Frontend: prevent double submit, refresh slots on conflict, show pending-approval state. **Backend note:** `slotId` must be the exact `"HH:MM-HH:MM"` string from `GET /availability/slots` — only the start half is actually used; the end time is recomputed from the requested services' durations.
 
-### GET /bookings/:id; GET /bookings/my-bookings
+### GET /bookings/:id; GET /bookings/my-bookings — 🟢 Live
 
 Purpose: Booking detail/history. Authentication: detail: Customer owner, owning Salon Owner, or Admin; history: Customer. History query: `status=PENDING|APPROVED|CANCELLED|COMPLETED`. Detail success: `{ "booking": {} }`. Errors: `401`, `403`, `404`, `500`. Frontend: skeleton detail/history and status-specific empty state.
 
-### POST /bookings/:id/cancel
+### POST /bookings/:id/cancel — 🟢 Live (provisional policy)
 
-Purpose: Customer cancellation. Authentication: booking owner. Body: `{ "reason":"Change of plans" }`. Validation: upcoming, not completed; cancellation policy/strike rules apply. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirmation dialog, mutation lock, update local availability/history.
+Purpose: Customer cancellation. Authentication: booking owner. Body: `{ "reason":"Change of plans" }`. Validation: upcoming, not completed; cancellation policy/strike rules apply. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirmation dialog, mutation lock, update local availability/history. **Backend note:** the real cancellation cutoff/strike policy is still being finalized with the client — today, any PENDING/APPROVED booking can be cancelled any time before its start, with no strike ever recorded. This will change once the policy is confirmed; don't build frontend copy that promises today's behavior is final.
 
-### POST /bookings/:id/reschedule-request; POST /bookings/:id/approve-reschedule; POST /bookings/:id/reject-reschedule
+### POST /bookings/:id/reschedule-request; POST /bookings/:id/approve-reschedule; POST /bookings/:id/reject-reschedule — 🟢 Live
 
-Purpose: Customer proposed reschedule and Salon Owner decision. Authentication: customer owner for request; owning Salon Owner for decision. Request body: `{ "bookingDate":"2026-10-03", "slotId":"slot_456", "reason":"Not available" }`; rejection body `{ "reason":"" }`; approval body not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `422`, `500`. Frontend: retain original appointment until accepted; show request-pending UI.
+Purpose: Customer proposed reschedule and Salon Owner decision. Authentication: customer owner for request; owning Salon Owner for decision. Request body: `{ "bookingDate":"2026-10-03", "slotId":"slot_456", "reason":"Not available" }`; rejection body `{ "reason":"" }`; approval body not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `422`, `500`. Frontend: retain original appointment until accepted; show request-pending UI. **Backend note:** approve/reject always act on the booking's most recent pending reschedule request — there's no request ID in these routes.
 
-### GET /salon-bookings; POST /salon-bookings/:id/approve; POST /salon-bookings/:id/reject; POST /salon-bookings/:id/propose-reschedule; POST /salon-bookings/walk-in
+### GET /salon-bookings; POST /salon-bookings/:id/approve; POST /salon-bookings/:id/reject; POST /salon-bookings/:id/propose-reschedule; POST /salon-bookings/walk-in — 🟢 Live
 
-Purpose: Salon booking management. Authentication: owning Salon Owner. List query: `status=PENDING|APPROVED|COMPLETED|CANCELLED`. Approve body: `{ "notes":"" }`; reject body `{ "reason":"" }` (reason required); proposed-reschedule body `{ "bookingDate":"", "slotId":"", "reason":"" }`; walk-in body `{ "customerName":"", "customerPhone":"", "services":[], "staffId":"", "bookingDate":"", "slotId":"" }`. Validation: owned booking/branch; full availability validation; walk-ins consume capacity and use standard duration/pricing. Errors: `400`, `401`, `403`, `404`, `409`, `422`, `500`. Frontend: owner dashboard status filters, action-level loading, no-bookings state, confirm reject/walk-in creation.
+Purpose: Salon booking management. Authentication: owning Salon Owner. List query: `status=PENDING|APPROVED|COMPLETED|CANCELLED`. Approve body: `{ "notes":"" }`; reject body `{ "reason":"" }` (reason required); proposed-reschedule body `{ "bookingDate":"", "slotId":"", "reason":"" }`; walk-in body `{ "customerName":"", "customerPhone":"", "services":[], "staffId":"", "bookingDate":"", "slotId":"" }`. Validation: owned booking/branch; full availability validation; walk-ins consume capacity and use standard duration/pricing. Errors: `400`, `401`, `403`, `404`, `409`, `422`, `500`. Frontend: owner dashboard status filters, action-level loading, no-bookings state, confirm reject/walk-in creation. **Backend notes:** (1) `walk-in`'s `staffId` is required, not optional as elsewhere — it's the only field in this body that tells the backend which branch the walk-in belongs to, and a walk-in is created straight to `APPROVED` (no separate approval step). (2) `propose-reschedule` creates the request, but there's currently no endpoint for the customer to accept/reject a salon-proposed reschedule — don't build that screen yet, it has nothing to call.
 
 ### POST /salon-bookings/:id/block-slot
 
