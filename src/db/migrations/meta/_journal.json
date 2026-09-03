@@ -57,6 +57,13 @@
       "when": 1788472703944,
       "tag": "0007_funny_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788478271606,
+      "tag": "0008_chemical_maddog",
+      "breakpoints": true
     }
   ]
 }

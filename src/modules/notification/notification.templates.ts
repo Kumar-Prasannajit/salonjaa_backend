@@ -53,6 +53,22 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
     subject: "Your Salonjaa refund request was received",
     body: `Your refund request for booking ${d.bookingNumber} (amount ${d.amount}) has been received and is pending review.`,
   }),
+  SALON_VERIFIED: (d) => ({
+    subject: "Your Salonjaa salon is now verified",
+    body: `${d.salonName} has been verified and is now visible to customers.`,
+  }),
+  SALON_REJECTED: (d) => ({
+    subject: "Your Salonjaa salon registration was declined",
+    body: `${d.salonName}'s registration was declined. Reason: ${d.reason ?? "Not specified"}.`,
+  }),
+  SALON_SUSPENDED: (d) => ({
+    subject: "Your Salonjaa salon has been suspended",
+    body: `${d.salonName} has been suspended. Reason: ${d.reason ?? "Not specified"}. Contact support for details.`,
+  }),
+  SALON_REACTIVATED: (d) => ({
+    subject: "Your Salonjaa salon is active again",
+    body: `${d.salonName} has been reactivated and is visible to customers again.`,
+  }),
 };
 
 export function renderNotification(eventType: NotificationEventType, data: Record<string, string>): RenderedNotification {

@@ -14,7 +14,11 @@ export type NotificationEventType =
   | "BOOKING_RESCHEDULE_APPROVED"
   | "BOOKING_RESCHEDULE_REJECTED"
   | "BOOKING_RESCHEDULE_PROPOSED"
-  | "REFUND_REQUESTED";
+  | "REFUND_REQUESTED"
+  | "SALON_VERIFIED"
+  | "SALON_REJECTED"
+  | "SALON_SUSPENDED"
+  | "SALON_REACTIVATED";
 
 export interface NotifyInput {
   userId: string;
