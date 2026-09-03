@@ -5,6 +5,10 @@ import { checkDatabaseConnection, closeDatabaseConnection } from "@/config/datab
 import { closeRedisConnection } from "@/config/redis";
 import { startBookingExpiryWorker, stopBookingExpiryWorker } from "@/queues/booking-expiry.worker";
 import { closeBookingExpiryQueue } from "@/queues/booking-expiry.queue";
+import { startBookingCompletionWorker, stopBookingCompletionWorker } from "@/queues/booking-completion.worker";
+import { closeBookingCompletionQueue } from "@/queues/booking-completion.queue";
+import { startNotificationSendWorker, stopNotificationSendWorker } from "@/queues/notification-send.worker";
+import { closeNotificationSendQueue } from "@/queues/notification-send.queue";
 
 async function main(): Promise<void> {
   await checkDatabaseConnection();
@@ -16,12 +20,18 @@ async function main(): Promise<void> {
   });
 
   startBookingExpiryWorker();
+  startBookingCompletionWorker();
+  startNotificationSendWorker();
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
     server.close(async () => {
       await stopBookingExpiryWorker();
       await closeBookingExpiryQueue();
+      await stopBookingCompletionWorker();
+      await closeBookingCompletionQueue();
+      await stopNotificationSendWorker();
+      await closeNotificationSendQueue();
       await closeDatabaseConnection();
       await closeRedisConnection();
       process.exit(0);

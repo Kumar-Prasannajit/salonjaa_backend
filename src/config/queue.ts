@@ -16,6 +16,10 @@ export const queueConnection: ConnectionOptions = {
 export const QUEUE_NAMES = {
   NOTIFICATION_SEND: "notification.send",
   BOOKING_EXPIRE: "booking.expire",
+  // Not in the TRD's original job list — added so Reviews (which require a COMPLETED
+  // booking, per frontend_handover.md) have a way to ever reach that state, since no
+  // documented endpoint marks a booking complete. Decided with the user.
+  BOOKING_COMPLETE: "booking.complete",
   BOOKING_CHECKIN_OTP: "booking.checkin-otp",
   PROMOTION_DEACTIVATE: "promotion.deactivate",
   PAYMENT_PROVIDER_EVENT: "payment.provider-event",

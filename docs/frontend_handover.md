@@ -14,7 +14,7 @@ This whole document describes the target contract. Only the sections marked **�
 | Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
 | Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
 | Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
-| Reviews | Review (not started) | ⚪ Not built |
+| Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) |
 | Admin | Admin (not started) | ⚪ Not built |
 
 A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo — but it was only ever generated for Modules 1-4 and hasn't been kept in sync since (by explicit choice, not an oversight). Don't treat it as covering everything marked 🟢 Live above.
@@ -139,17 +139,17 @@ Purpose: Payment/refund/settlement reads and customer refund request. Authentica
 
 Purpose: Validate coupon before booking confirmation. Authentication: Customer. Body `{ "couponCode":"", "bookingAmount":1000 }`. Success `{ "valid":true, "discount":100 }`. Errors: `400`, `401`, `422`, `500`. Frontend: validate on explicit apply, show inline result, never trust client-calculated discount. **Backend note:** this is a preview only — there's no field on `POST /bookings` to actually attach a coupon to a booking, so validating a coupon here has no side effect and doesn't reserve/consume it. An invalid, expired, exhausted, or below-minimum coupon returns `422` with a message, not a soft `{valid:false}`.
 
-## Reviews — ⚪ Not built (Review module not started)
+## Reviews — 🟢 Live (Module 8 — Review + Notification), except images
 
-### POST /reviews; POST /reviews/:reviewId/images; PATCH /reviews/:reviewId
+### POST /reviews — 🟢 Live; PATCH /reviews/:reviewId — 🟢 Live (edit period provisional); POST /reviews/:reviewId/images — ⚪ Not built
 
-Purpose: Create, upload images for, and edit an owned review. Authentication: Customer. Create body `{ "bookingId":"", "overallRating":5, "review":"Excellent service", "serviceRating":5, "staffRating":5, "hygieneRating":5, "ambienceRating":5, "productRating":5 }`. Validation: completed booking, one review/booking, ratings 1–5; edit only by owner in allowed edit period; image upload contract not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `422`, `500`. Frontend: validate rating bounds, upload with per-file progress, show completed-booking-only empty/locked state.
+Purpose: Create, upload images for, and edit an owned review. Authentication: Customer. Create body `{ "bookingId":"", "overallRating":5, "review":"Excellent service", "serviceRating":5, "staffRating":5, "hygieneRating":5, "ambienceRating":5, "productRating":5 }`. Validation: completed booking, one review/booking, ratings 1–5; edit only by owner in allowed edit period; image upload contract not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `422`, `500`. Frontend: validate rating bounds, upload with per-file progress, show completed-booking-only empty/locked state. **Backend notes:** a booking becomes reviewable automatically once its scheduled time passes (no separate "mark complete" action exists — this happens on its own). The "allowed edit period" has no defined cutoff yet (same unresolved policy category as booking cancellation) — edits are accepted at any time for now. `POST /reviews/:reviewId/images` is **not implemented** — its request contract was never specified anywhere, so there was nothing to build against; don't wire an image-upload UI to it yet.
 
-### GET /reviews/:reviewId; GET /reviews/salon/:salonId; GET /reviews/service/:serviceId; GET /reviews/staff/:staffId
+### GET /reviews/:reviewId; GET /reviews/salon/:salonId; GET /reviews/service/:serviceId; GET /reviews/staff/:staffId — 🟢 Live
 
-Purpose: Read review detail/listings. Authentication: not specified; treat as public display routes. Request/response pagination contracts not supplied. Errors: `400`, `404`, `500`. Frontend: skeleton cards and “no reviews yet” state.
+Purpose: Read review detail/listings. Authentication: not specified; treat as public display routes. Request/response pagination contracts not supplied. Errors: `400`, `404`, `500`. Frontend: skeleton cards and “no reviews yet” state. **Backend note:** no pagination is implemented (none was specified) — these return the full list every time.
 
-### POST /reviews/:reviewId/report; POST /reviews/:reviewId/reply
+### POST /reviews/:reviewId/report; POST /reviews/:reviewId/reply — 🟢 Live
 
 Purpose: Report review or salon-owner reply. Authentication: report Customer or Salon Owner; reply owning Salon Owner. Report body `{ "reason":"" }`; reply body `{ "message":"" }`. Validation: reviewer identity/ownership; response contracts not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirm report, lock reply submit while pending, update thread on success.
 

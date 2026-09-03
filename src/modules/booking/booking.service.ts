@@ -3,6 +3,7 @@ import { AvailabilityRepository } from "@/modules/availability/availability.repo
 import { SalonService } from "@/modules/salon/salon.service";
 import { BranchService } from "@/modules/branch/branch.service";
 import { StaffService } from "@/modules/staff/staff.service";
+import { NotificationService } from "@/modules/notification/notification.service";
 import {
   ApproveBookingInput,
   BookingDTO,
@@ -18,6 +19,7 @@ import { generateBookingNumber } from "@/shared/crypto";
 import { CAPACITY_CONSUMING_BOOKING_STATUSES, ROLE_NAMES } from "@/shared/constants";
 import { env } from "@/config/env";
 import { scheduleBookingExpiry } from "@/queues/booking-expiry.queue";
+import { scheduleBookingCompletion, rescheduleBookingCompletion } from "@/queues/booking-completion.queue";
 import { bookings } from "@/db/schema";
 
 type BookingRow = typeof bookings.$inferSelect;
@@ -29,7 +31,8 @@ export class BookingService {
     private readonly availabilityRepo: AvailabilityRepository = new AvailabilityRepository(),
     private readonly salonService: SalonService = new SalonService(),
     private readonly branchService: BranchService = new BranchService(),
-    private readonly staffService: StaffService = new StaffService()
+    private readonly staffService: StaffService = new StaffService(),
+    private readonly notificationService: NotificationService = new NotificationService()
   ) {}
 
   async create(userId: string, input: CreateBookingInput): Promise<{ bookingId: string; status: string }> {
@@ -78,6 +81,11 @@ export class BookingService {
     });
 
     await scheduleBookingExpiry(booking.id, env.BOOKING_DEFAULT_EXPIRY_HOURS * 60 * 60 * 1000);
+    await this.notificationService.notify({
+      userId,
+      eventType: "BOOKING_CREATED",
+      data: { bookingNumber: booking.bookingNumber },
+    });
 
     return { bookingId: booking.id, status: booking.bookingStatus };
   }
@@ -133,6 +141,16 @@ export class BookingService {
       userId,
       reason
     );
+
+    const ownerUserId = await this.salonService.findOwnerUserId(booking.salonId);
+    if (ownerUserId) {
+      await this.notificationService.notify({
+        userId: ownerUserId,
+        eventType: "BOOKING_CANCELLED",
+        data: { bookingNumber: booking.bookingNumber, reason: reason ?? "Not specified" },
+      });
+    }
+
     return this.toDTO(updated);
   }
 
@@ -156,6 +174,16 @@ export class BookingService {
       newScheduledEnd: end,
       reason: input.reason,
     });
+
+    const ownerUserId = await this.salonService.findOwnerUserId(booking.salonId);
+    if (ownerUserId) {
+      await this.notificationService.notify({
+        userId: ownerUserId,
+        eventType: "BOOKING_RESCHEDULE_REQUESTED",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
     return this.toRescheduleDTO(request);
   }
 
@@ -184,16 +212,39 @@ export class BookingService {
 
     const updated = await this.repo.updateScheduledTime(bookingId, request.newScheduledStart, request.newScheduledEnd);
     await this.repo.resolveRescheduleRequest(request.id, "ACCEPTED");
+
+    // Only an already-APPROVED booking has a completion job scheduled (see approve() below) —
+    // reschedule it to the new end time so it doesn't fire early against the old schedule.
+    if (booking.bookingStatus === "APPROVED") {
+      await rescheduleBookingCompletion(bookingId, request.newScheduledEnd.getTime() - Date.now());
+    }
+    if (booking.customerId) {
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_RESCHEDULE_APPROVED",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
     return this.toDTO(updated);
   }
 
   async rejectReschedule(userId: string, bookingId: string, reason?: string): Promise<RescheduleRequestDTO> {
-    await this.assertOwnedBooking(userId, bookingId);
+    const booking = await this.assertOwnedBooking(userId, bookingId);
     const request = await this.repo.findLatestPendingRescheduleRequest(bookingId);
     if (!request) {
       throw new NotFoundError("No pending reschedule request for this booking");
     }
     const updated = await this.repo.resolveRescheduleRequest(request.id, "REJECTED", reason);
+
+    if (booking.customerId) {
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_RESCHEDULE_REJECTED",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
     return this.toRescheduleDTO(updated);
   }
 
@@ -225,6 +276,16 @@ export class BookingService {
       userId,
       input.notes
     );
+
+    await scheduleBookingCompletion(bookingId, booking.scheduledEnd.getTime() - Date.now());
+    if (booking.customerId) {
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_APPROVED",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
     return this.toDTO(updated);
   }
 
@@ -241,6 +302,15 @@ export class BookingService {
       userId,
       reason
     );
+
+    if (booking.customerId) {
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_REJECTED",
+        data: { bookingNumber: booking.bookingNumber, reason },
+      });
+    }
+
     return this.toDTO(updated);
   }
 
@@ -266,6 +336,15 @@ export class BookingService {
       newScheduledEnd: end,
       reason: input.reason,
     });
+
+    if (booking.customerId) {
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_RESCHEDULE_PROPOSED",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
     return this.toRescheduleDTO(request);
   }
 
@@ -320,6 +399,9 @@ export class BookingService {
       services: lines,
       changedByUserId: userId,
     });
+
+    // No notification — walk-in customers have no account (customerId is null).
+    await scheduleBookingCompletion(booking.id, end.getTime() - Date.now());
 
     return this.toDTO(booking);
   }

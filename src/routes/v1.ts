@@ -9,6 +9,7 @@ import availabilityRoutes from "@/modules/availability/availability.routes";
 import bookingRoutes from "@/modules/booking/booking.routes";
 import salonBookingRoutes from "@/modules/booking/salon-booking.routes";
 import paymentRoutes from "@/modules/payment/payment.routes";
+import reviewRoutes from "@/modules/review/review.routes";
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.use("/availability", availabilityRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/salon-bookings", salonBookingRoutes);
 router.use("/payments", paymentRoutes);
+router.use("/reviews", reviewRoutes);
 
 // Additional module routers are mounted here as each module is implemented:
 // ...

@@ -49,6 +49,17 @@ export class SalonRepository {
     return salon ?? null;
   }
 
+  /** Resolves the owning user's ID from a salonId — used by Notification to address the owner. */
+  async findOwnerUserIdBySalonId(salonId: string): Promise<string | null> {
+    const [row] = await db
+      .select({ userId: salonOwnerProfiles.userId })
+      .from(salons)
+      .innerJoin(salonOwnerProfiles, eq(salons.ownerProfileId, salonOwnerProfiles.id))
+      .where(eq(salons.id, salonId))
+      .limit(1);
+    return row?.userId ?? null;
+  }
+
   async findById(salonId: string) {
     const [salon] = await db
       .select()

@@ -1,6 +1,7 @@
 import { PaymentRepository } from "@/modules/payment/payment.repository";
 import { BookingRepository } from "@/modules/booking/booking.repository";
 import { SalonService } from "@/modules/salon/salon.service";
+import { NotificationService } from "@/modules/notification/notification.service";
 import {
   CreateOrderInput,
   PaymentDTO,
@@ -26,7 +27,8 @@ export class PaymentService {
   constructor(
     private readonly repo: PaymentRepository = new PaymentRepository(),
     private readonly bookingRepo: BookingRepository = new BookingRepository(),
-    private readonly salonService: SalonService = new SalonService()
+    private readonly salonService: SalonService = new SalonService(),
+    private readonly notificationService: NotificationService = new NotificationService()
   ) {}
 
   async createOrder(userId: string, input: CreateOrderInput): Promise<{ orderId: string; amount: number; currency: string }> {
@@ -155,6 +157,13 @@ export class PaymentService {
       amount: payment.amount,
       reason: input.reason,
     });
+
+    await this.notificationService.notify({
+      userId,
+      eventType: "REFUND_REQUESTED",
+      data: { bookingNumber: booking.bookingNumber, amount: String(refund.amount) },
+    });
+
     return this.toRefundDTO(refund);
   }
 

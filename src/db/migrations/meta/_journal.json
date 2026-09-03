@@ -50,6 +50,13 @@
       "when": 1788465198542,
       "tag": "0006_chunky_pixie",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788472703944,
+      "tag": "0007_funny_leech",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,11 @@
 import { Job, Worker } from "bullmq";
 import { queueConnection, QUEUE_NAMES } from "@/config/queue";
 import { BookingRepository } from "@/modules/booking/booking.repository";
+import { NotificationService } from "@/modules/notification/notification.service";
 import { logger } from "@/shared/logger";
 
 const repo = new BookingRepository();
+const notificationService = new NotificationService();
 
 async function processExpiry(job: Job<{ bookingId: string }>): Promise<void> {
   const booking = await repo.findById(job.data.bookingId);
@@ -21,6 +23,14 @@ async function processExpiry(job: Job<{ bookingId: string }>): Promise<void> {
     "Booking expired: no owner decision within the configured window"
   );
   logger.info({ bookingId: booking.id }, "Booking expired");
+
+  if (booking.customerId) {
+    await notificationService.notify({
+      userId: booking.customerId,
+      eventType: "BOOKING_EXPIRED",
+      data: { bookingNumber: booking.bookingNumber },
+    });
+  }
 }
 
 let worker: Worker | null = null;

@@ -54,6 +54,18 @@ export const otpStatusEnum = pgEnum("otp_status", ["ACTIVE", "VERIFIED", "EXPIRE
 
 // Review / complaint / admin
 export const reviewReportStatusEnum = pgEnum("review_report_status", ["PENDING", "APPROVED", "REJECTED"]);
+// Not in the TRD's enum list (§6) — the documented POST /reviews body has five fixed rating
+// fields (serviceRating, staffRating, hygieneRating, ambienceRating, productRating), which
+// TRD §4's review_category_ratings table stores as generic (category, rating) rows. This
+// enum is the minimal addition needed to give "category" a concrete value set matching that
+// exact documented body.
+export const reviewCategoryEnum = pgEnum("review_category", [
+  "SERVICE",
+  "STAFF",
+  "HYGIENE",
+  "AMBIENCE",
+  "PRODUCT",
+]);
 export const complaintTypeEnum = pgEnum("complaint_type", ["BOOKING", "PAYMENT", "SALON", "STAFF", "REFUND", "OTHER"]);
 export const complaintStatusEnum = pgEnum("complaint_status", ["OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"]);
 export const adminActionTypeEnum = pgEnum("admin_action_type", [

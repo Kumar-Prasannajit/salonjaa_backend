@@ -41,6 +41,11 @@ export class SalonService {
     await this.repo.softDelete(salonId);
   }
 
+  /** Used by Notification to resolve who to address as "the salon owner" for a given salonId. */
+  async findOwnerUserId(salonId: string): Promise<string | null> {
+    return this.repo.findOwnerUserIdBySalonId(salonId);
+  }
+
   /** Used by other modules (Branch, Staff, Service) to verify ownership before mutating child resources. */
   async assertOwned(userId: string, salonId: string) {
     const profile = await this.repo.findOwnerProfileByUserId(userId);
