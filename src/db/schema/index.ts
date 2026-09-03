@@ -8,3 +8,4 @@ export * from "@/db/schema/branch";
 export * from "@/db/schema/staff";
 export * from "@/db/schema/service";
 export * from "@/db/schema/booking";
+export * from "@/db/schema/payment";

@@ -34,4 +34,4 @@ npm run db:studio         # Drizzle Studio — browser DB viewer, like Prisma St
 ```
 
 ## Environment
-Copy `.env.example` to `.env` and fill in `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (32+ char random strings) before running anything. SMTP is optional — without it, OTPs print to the server console via the dev log-email provider instead of sending real email.
+Copy `.env.example` to `.env` and fill in `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (32+ char random strings) before running anything. SMTP is optional — without it, OTPs print to the server console via the dev log-email provider instead of sending real email. `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are also optional at boot (same pattern) — use **test mode** keys from https://dashboard.razorpay.com/app/keys; without them, `POST /payments/create-order` and `POST /payments/verify` fail at request time with a clear error, everything else still works.

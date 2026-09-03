@@ -49,6 +49,13 @@ const envSchema = z.object({
 
   BOOKING_DEFAULT_EXPIRY_HOURS: z.coerce.number().int().positive().default(12),
 
+  // Razorpay: optional at boot (like SMTP) so the app still starts before keys are supplied —
+  // the Payment module throws a clear runtime error if a payment endpoint is hit without them.
+  // Only the client-driven create-order/verify flow is documented (frontend_handover.md); no
+  // webhook receiver endpoint is built, so no webhook secret is needed here.
+  RAZORPAY_KEY_ID: z.string().optional().default(""),
+  RAZORPAY_KEY_SECRET: z.string().optional().default(""),
+
   SMTP_HOST: z.string().optional().default(""),
   SMTP_PORT: z.coerce.number().int().optional().default(587),
   SMTP_USER: z.string().optional().default(""),

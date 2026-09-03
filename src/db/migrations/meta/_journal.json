@@ -43,6 +43,13 @@
       "when": 1788463024723,
       "tag": "0005_boring_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788465198542,
+      "tag": "0006_chunky_pixie",
+      "breakpoints": true
     }
   ]
 }

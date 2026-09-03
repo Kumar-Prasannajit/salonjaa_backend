@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, closeDatabaseConnection } from "@/config/database";
-import { roles, serviceCategories } from "@/db/schema";
+import { roles, serviceCategories, coupons } from "@/db/schema";
 import { ROLE_NAMES } from "@/shared/constants";
 import { logger } from "@/shared/logger";
 
@@ -45,9 +45,48 @@ async function seedServiceCategories(): Promise<void> {
   logger.info(`Service categories seeded: ${STARTER_CATEGORIES.length}`);
 }
 
+// No CRUD endpoint is documented anywhere in frontend_handover.md for coupons (only
+// POST /payments/coupons/validate) — same precedent as service_categories: this stays a
+// local/dev seed list until an owner/admin coupon-management contract exists.
+const STARTER_COUPONS = [
+  {
+    couponCode: "WELCOME10",
+    type: "PERCENTAGE" as const,
+    value: 10,
+    minimumAmount: 200,
+    maxDiscount: 150,
+    usageLimit: 100,
+  },
+  {
+    couponCode: "FLAT50",
+    type: "FIXED" as const,
+    value: 50,
+    minimumAmount: 300,
+    maxDiscount: null,
+    usageLimit: null,
+  },
+];
+
+async function seedCoupons(): Promise<void> {
+  // couponCode is only uniquely-indexed among non-deleted rows, same reasoning as
+  // service_categories' slug — check first instead of relying on onConflictDoNothing.
+  for (const coupon of STARTER_COUPONS) {
+    const [existing] = await db
+      .select({ id: coupons.id })
+      .from(coupons)
+      .where(and(eq(coupons.couponCode, coupon.couponCode), isNull(coupons.deletedAt)))
+      .limit(1);
+    if (!existing) {
+      await db.insert(coupons).values(coupon);
+    }
+  }
+  logger.info(`Coupons seeded: ${STARTER_COUPONS.length}`);
+}
+
 async function run(): Promise<void> {
   await seedRoles();
   await seedServiceCategories();
+  await seedCoupons();
   await closeDatabaseConnection();
 }
 

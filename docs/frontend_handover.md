@@ -13,11 +13,11 @@ This whole document describes the target contract. Only the sections marked **�
 | Salon and Branch | Module 3 — Salon + Branch | 🟢 Live |
 | Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
 | Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
-| Payment and Coupon | Payment, Coupon (not started) | ⚪ Not built |
+| Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
 | Reviews | Review (not started) | ⚪ Not built |
 | Admin | Admin (not started) | ⚪ Not built |
 
-A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist for the 🟢 Live sections only, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo.
+A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo — but it was only ever generated for Modules 1-4 and hasn't been kept in sync since (by explicit choice, not an oversight). Don't treat it as covering everything marked 🟢 Live above.
 
 ## Auth — 🟢 Live (Module 1 — Foundation + Auth)
 
@@ -125,19 +125,19 @@ Purpose: Salon booking management. Authentication: owning Salon Owner. List quer
 
 Purpose: Explicitly marked **Future Feature — Not MVP** in the supplied API Inventory. Do not call or build a UI for this endpoint.
 
-## Payment and Coupon — ⚪ Not built (Payment, Coupon modules not started)
+## Payment and Coupon — 🟢 Live (Module 7 — Payment + Coupon)
 
-### POST /payments/create-order; POST /payments/verify
+### POST /payments/create-order; POST /payments/verify — 🟢 Live
 
-Purpose: Create/verify online payment. Authentication: Customer. Create body `{ "bookingId":"booking_123" }`; success `{ "orderId":"", "amount":500, "currency":"INR" }`. Verify body `{ "orderId":"", "paymentId":"", "signature":"" }`; success `{ "success":true, "paymentStatus":"SUCCESS" }`. Errors: `400`, `401`, `403`, `409`, `422`, `500`. Frontend: prevent duplicate payment initiation; complete only after verification response; show retry UI for failure.
+Purpose: Create/verify online payment. Authentication: Customer. Create body `{ "bookingId":"booking_123" }`; success `{ "orderId":"", "amount":500, "currency":"INR" }`. Verify body `{ "orderId":"", "paymentId":"", "signature":"" }`; success `{ "success":true, "paymentStatus":"SUCCESS" }`. Errors: `400`, `401`, `403`, `409`, `422`, `500`. Frontend: prevent duplicate payment initiation; complete only after verification response; show retry UI for failure. **Backend notes:** provider is Razorpay — `create-order` requires the booking to already be `APPROVED` by the salon (409 otherwise) and blocks a second order while one is pending/paid (a failed one can be retried). No webhook exists; a payment only ever updates when the frontend actually calls `/verify` after Razorpay checkout completes, so don't skip that call on any code path.
 
-### GET /payments/:paymentId; GET /payments/my-payments; POST /payments/refund-request; GET /payments/refunds; GET /payments/salon-settlements
+### GET /payments/:paymentId; GET /payments/my-payments; POST /payments/refund-request; GET /payments/refunds; GET /payments/salon-settlements — 🟢 Live (refund policy provisional)
 
-Purpose: Payment/refund/settlement reads and customer refund request. Authentication: payment detail Customer owner, owning Salon Owner, or Admin; my/refunds Customer; settlements owning Salon Owner. Refund body `{ "bookingId":"", "reason":"" }`; booking must be refund-eligible, initial status PENDING. Settlement example `[{ "settlementId":"", "amount":5000, "status":"COMPLETED" }]`. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: use finance-table skeletons and empty states; show refund PENDING as non-final.
+Purpose: Payment/refund/settlement reads and customer refund request. Authentication: payment detail Customer owner, owning Salon Owner, or Admin; my/refunds Customer; settlements owning Salon Owner. Refund body `{ "bookingId":"", "reason":"" }`; booking must be refund-eligible, initial status PENDING. Settlement example `[{ "settlementId":"", "amount":5000, "status":"COMPLETED" }]`. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: use finance-table skeletons and empty states; show refund PENDING as non-final. **Backend note:** like booking cancellation, the real refund eligibility policy is still being finalized with the client — today, a refund can be requested only for a `CANCELLED` or `COMPLETED` booking with a successful payment, full amount only, once per payment. This will change once the policy is confirmed. `salon-settlements` will return an empty list until settlement records are created manually — there's no endpoint that generates them yet.
 
-### POST /payments/coupons/validate
+### POST /payments/coupons/validate — 🟢 Live
 
-Purpose: Validate coupon before booking confirmation. Authentication: Customer. Body `{ "couponCode":"", "bookingAmount":1000 }`. Success `{ "valid":true, "discount":100 }`. Errors: `400`, `401`, `422`, `500`. Frontend: validate on explicit apply, show inline result, never trust client-calculated discount.
+Purpose: Validate coupon before booking confirmation. Authentication: Customer. Body `{ "couponCode":"", "bookingAmount":1000 }`. Success `{ "valid":true, "discount":100 }`. Errors: `400`, `401`, `422`, `500`. Frontend: validate on explicit apply, show inline result, never trust client-calculated discount. **Backend note:** this is a preview only — there's no field on `POST /bookings` to actually attach a coupon to a booking, so validating a coupon here has no side effect and doesn't reserve/consume it. An invalid, expired, exhausted, or below-minimum coupon returns `422` with a message, not a soft `{valid:false}`.
 
 ## Reviews — ⚪ Not built (Review module not started)
 
