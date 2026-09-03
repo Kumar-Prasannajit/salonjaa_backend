@@ -26,15 +26,27 @@ Status as of last session. Update this file whenever a module ships or a decisio
 - **Deferred (real TRD tables, but no documented endpoint yet — don't build these until a contract exists):** `salon_ownership_history`, `salon_gallery_images`, `branch_slot_templates`, `calendar_events`
 - First salon creation by a user auto-creates their `salon_owner_profiles` row (find-or-create pattern) — there is no separate "become an owner" endpoint anywhere in the docs
 
+### Module 4 — Catalogue + Staff
+- Migration `0003_clever_living_tribunal.sql` (staff, staff_leaves, branch_services, service_categories, staff_services)
+- `POST/GET /api/v1/staff`, `GET/PATCH/DELETE /api/v1/staff/:id` — all require `SALON_OWNER` role + branch ownership (`BranchService.assertOwned`, now public for cross-module use — see Branch's Staff/Service note below). `GET /staff` takes optional `branchId` query; omitted lists staff across every branch the caller owns (same pattern as `GET /branches`'s optional `salonId`). `DELETE` soft-deletes (`deletedAt`).
+- `POST /api/v1/staff/:id/leave`, `DELETE /api/v1/staff/:id/leave/:leaveId` — leave cancellation sets `status = CANCELLED` per TRD ("cancellation changes status, never removes record") — `staff_leaves` has no `deletedAt` column, this is intentional, not a missed soft-delete.
+- `POST/GET /api/v1/services`, `GET/PATCH/DELETE /api/v1/services/:id` — same branch-ownership + optional-`branchId` pattern as Staff. Table is `branch_services` in the DB (TRD naming), exposed as `/services` per frontend_handover.md.
+- `POST /api/v1/services/:id/staff`, `DELETE /api/v1/services/:id/staff/:staffId` — staff↔service assignment; 409 on duplicate assignment, 404 if the staff member isn't in the same branch as the service (existence not leaked across branches, same philosophy as `assertOwned`).
+- **`service_categories` has no CRUD endpoint anywhere in the docs** (TRD calls it "platform category lifecycle"; the Admin API inventory is empty in frontend_handover.md). Rows come only from `npm run db:seed` (8 starter categories) — same precedent as `db:grant-role` for roles. Build a real Admin endpoint only when that module defines the contract; don't add owner-facing category CRUD speculatively.
+- **Deferred (real TRD table, no documented endpoint):** `service_images` (multi-image gallery per service). `branch_services` does have a single `imageUrl` column (TRD's "image URL"), settable via `PATCH /services/:id` — same precedent as `salons.logo`/`coverImage` being PATCH-only, undocumented-in-create fields.
+- Money/experience fields (`basePrice`, `salary`, `consultationFee`) use `doublePrecision`, not `numeric` — the installed `drizzle-orm@0.33` doesn't support `numeric(..., { mode: "number" })`, and this codebase has no other numeric-string handling yet. Matches the existing `latitude`/`longitude` precedent. Revisit if exact decimal precision becomes a requirement (e.g. for Payment).
+- `BranchService.assertOwned` was made `public` (was `private`) so Staff and Service can call it directly, per CONVENTIONS.md's "call the parent module's service to verify ownership" rule — same relationship Branch already has with `SalonService.assertOwned`.
+
 ## Dev tooling added along the way
 - `npm run db:grant-role -- <email> <ROLE_NAME>` — CLI-only role grant (SALON_OWNER / ADMIN). No API endpoint for this exists in any source doc, so don't invent one — this stays a local dev script.
 - `npm run db:studio` — Drizzle Studio (Prisma-Studio equivalent), browser-based DB browser at the URL it prints. Uses the same `DATABASE_URL` as the app.
+- `npm run db:seed` now also seeds 8 starter `service_categories` rows (see Module 4 above), in addition to the three roles.
 
 ## Location/maps decision (settled, don't relitigate)
 Backend stores plain `latitude`/`longitude` numeric columns only. No Google Maps dependency anywhere in the backend. `navigator.geolocation` (free, built into browsers) is what the frontend uses for "find near me." Nearby-branch search will be plain Haversine math or Postgres `earthdistance`, built when the Availability/Search module is built — not yet implemented.
 
 ## Not started yet
-Staff, Service Category, Service, Availability, Booking, Payment, Coupon, Review, Notification, Admin. Follow `## 14. Development Order` in `docs/TRD.md` for the intended sequence — do not jump ahead to Booking/Payment before Staff/Service/Availability exist, since Booking depends on all of them.
+Availability, Booking, Payment, Coupon, Review, Notification, Admin. Follow `## 14. Development Order` in `docs/TRD.md` for the intended sequence — do not jump ahead to Booking/Payment before Availability exists, since Booking depends on it.
 
 ## Delivery workflow in use
 Each module is a separate git commit. Work is handed to the user as `git format-patch` output (`000N-description.patch`), applied on their machine with `git am`. Keep committing one module = one commit so this keeps working.

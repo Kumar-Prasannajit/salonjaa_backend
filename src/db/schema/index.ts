@@ -5,3 +5,5 @@ export * from "@/db/schema/notification";
 export * from "@/db/schema/address";
 export * from "@/db/schema/salon";
 export * from "@/db/schema/branch";
+export * from "@/db/schema/staff";
+export * from "@/db/schema/service";

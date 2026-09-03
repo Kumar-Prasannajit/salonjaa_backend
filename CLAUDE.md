@@ -28,7 +28,7 @@ npm run typecheck        # tsc --noEmit
 npm run build             # full build (includes tsc-alias for path resolution)
 npm run db:generate       # generate Drizzle migration from schema changes
 npm run db:migrate        # apply migrations
-npm run db:seed           # seed CUSTOMER/SALON_OWNER/ADMIN roles (run once, first setup)
+npm run db:seed           # seed CUSTOMER/SALON_OWNER/ADMIN roles + starter service_categories (run once, first setup)
 npm run db:grant-role -- <email> <ROLE>   # dev-only role grant
 npm run db:studio         # Drizzle Studio — browser DB viewer, like Prisma Studio
 ```

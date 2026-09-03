@@ -69,7 +69,8 @@ export class BranchService {
     return { branchId: rule.branchId, maxCapacityOverride: rule.maxCapacityOverride };
   }
 
-  private async assertOwned(userId: string, branchId: string) {
+  /** Used by other modules (Staff, Service) to verify branch ownership before mutating child resources. */
+  async assertOwned(userId: string, branchId: string) {
     const branch = await this.repo.findOwnedBranch(userId, branchId);
     if (!branch) {
       throw new NotFoundError("Branch not found");
