@@ -15,7 +15,7 @@ This whole document describes the target contract. Only the sections marked **�
 | Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
 | Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
 | Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) |
-| Admin | Module 9 — Admin | 🟡 Partial — salon approval only (🟢 Live); everything else below is ⚪ Not built |
+| Admin | Module 9 — Admin | 🟡 Partial — salon approval + refunds are 🟢 Live; complaints/reports next, everything else ⚪ Not built |
 
 A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo — but it was only ever generated for Modules 1-4 and hasn't been kept in sync since (by explicit choice, not an oversight). Don't treat it as covering everything marked 🟢 Live above.
 
@@ -153,13 +153,17 @@ Purpose: Read review detail/listings. Authentication: not specified; treat as pu
 
 Purpose: Report review or salon-owner reply. Authentication: report Customer or Salon Owner; reply owning Salon Owner. Report body `{ "reason":"" }`; reply body `{ "message":"" }`. Validation: reviewer identity/ownership; response contracts not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirm report, lock reply submit while pending, update thread on success.
 
-## Admin — 🟡 Partial (Module 9 — salon approval only)
+## Admin — 🟡 Partial (Module 9 — salon approval + refunds so far)
 
-The originally supplied Admin API Inventory contained no endpoints. Everything in this section was worked out directly between the developer and the client's representative (not sourced from a separate written spec) — treat it as authoritative for what's actually built, but expect more of Admin to be defined and added the same way over time.
+The originally supplied Admin API Inventory contained no endpoints. Everything in this section was worked out directly between the developer and the client's representative — first informally for salon approval, then formalized in `docs/ADMIN_CONTRACT.md` (backend repo) for Refunds/Complaints/Reports. Treat this section as authoritative for what's actually built; expect more to be added the same way over time.
 
 ### POST /admin/salons/:salonId/verify; POST /admin/salons/:salonId/reject; POST /admin/salons/:salonId/suspend; POST /admin/salons/:salonId/reactivate; GET /admin/salons; GET /admin/salons/:salonId — 🟢 Live
 
 Purpose: Review and govern salon registrations — the queue every salon sits in before it's publicly visible/bookable. Authentication: ADMIN role only. List query: `status=PENDING|VERIFIED|REJECTED` (optional — omit for all). Reject body `{ "reason":"" }` (required); suspend body `{ "reason":"" }` (required, independent of verification — pulls an already-verified salon offline); verify/reactivate take no body. List/detail success: salon object with an embedded `ownerProfile` (businessName/gstNumber/panNumber/kycStatus). Errors: `400`, `401`, `403`, `404`, `500`. Frontend: admin queue view with status filter, confirm dialog on reject/suspend (reason required), toast/refresh on decision. Notifies the salon owner by email on every decision (approved/rejected/suspended/reactivated).
 
+### GET /admin/refunds; GET /admin/refunds/:id; POST /admin/refunds/:id/approve; POST /admin/refunds/:id/reject — 🟢 Live
+
+Purpose: Manual refund decision queue — no automated eligibility check (the cancellation/refund policy is still undecided with the client; every refund is read and decided by hand). Authentication: ADMIN role only. List query: `status=PENDING|APPROVED|PROCESSING|COMPLETED|REJECTED` (optional). List/detail success: refund object with embedded `booking`, `payment`, and `customer` objects (enough context to decide without a second lookup). Approve body `{ "notes"?: string }`; reject body `{ "reason": string }` (required). Both only act on a `PENDING` refund (409 otherwise). Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: admin queue with status filter, confirm dialog on reject (reason required). **Backend note:** "approve" only marks the decision — no money actually moves; there's no payment gateway wired for issuing funds yet (MVP payment is pay-at-salon-style). Notifies the refund's customer by email on either decision.
+
 ### Not built yet
-Refund approval/processing, settlement creation, review report resolution, coupon/category management, complaints, customer strikes, reports/analytics. None of these have a defined contract yet — don't build frontend against assumed shapes for them.
+Complaint filing/resolution and the reports overview are next (`docs/ADMIN_CONTRACT.md`, backend repo) — check back once those ship. Explicitly out of scope for now: settlement creation, coupon/category management, customer strikes.

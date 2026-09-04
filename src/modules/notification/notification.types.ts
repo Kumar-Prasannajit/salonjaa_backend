@@ -18,7 +18,11 @@ export type NotificationEventType =
   | "SALON_VERIFIED"
   | "SALON_REJECTED"
   | "SALON_SUSPENDED"
-  | "SALON_REACTIVATED";
+  | "SALON_REACTIVATED"
+  | "REFUND_APPROVED"
+  | "REFUND_REJECTED"
+  | "COMPLAINT_RESOLVED"
+  | "COMPLAINT_REJECTED";
 
 export interface NotifyInput {
   userId: string;
