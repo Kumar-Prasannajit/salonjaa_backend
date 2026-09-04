@@ -12,6 +12,8 @@ import paymentRoutes from "@/modules/payment/payment.routes";
 import reviewRoutes from "@/modules/review/review.routes";
 import adminRoutes from "@/modules/admin/admin.routes";
 import adminRefundRoutes from "@/modules/admin/admin-refund.routes";
+import adminComplaintRoutes from "@/modules/admin/admin-complaint.routes";
+import complaintRoutes from "@/modules/complaint/complaint.routes";
 
 const router = Router();
 
@@ -28,6 +30,8 @@ router.use("/payments", paymentRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/admin", adminRoutes);
 router.use("/admin/refunds", adminRefundRoutes);
+router.use("/admin/complaints", adminComplaintRoutes);
+router.use("/complaints", complaintRoutes);
 
 // Additional module routers are mounted here as each module is implemented:
 // ...

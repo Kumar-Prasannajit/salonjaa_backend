@@ -15,7 +15,7 @@ This whole document describes the target contract. Only the sections marked **�
 | Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
 | Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
 | Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) |
-| Admin | Module 9 — Admin | 🟡 Partial — salon approval + refunds are 🟢 Live; complaints/reports next, everything else ⚪ Not built |
+| Admin | Module 9 — Admin | 🟡 Partial — salon approval, refunds, and complaints are 🟢 Live; reports overview next, everything else ⚪ Not built |
 
 A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo — but it was only ever generated for Modules 1-4 and hasn't been kept in sync since (by explicit choice, not an oversight). Don't treat it as covering everything marked 🟢 Live above.
 
@@ -153,7 +153,7 @@ Purpose: Read review detail/listings. Authentication: not specified; treat as pu
 
 Purpose: Report review or salon-owner reply. Authentication: report Customer or Salon Owner; reply owning Salon Owner. Report body `{ "reason":"" }`; reply body `{ "message":"" }`. Validation: reviewer identity/ownership; response contracts not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirm report, lock reply submit while pending, update thread on success.
 
-## Admin — 🟡 Partial (Module 9 — salon approval + refunds so far)
+## Admin — 🟡 Partial (Module 9 — salon approval + refunds + complaints so far)
 
 The originally supplied Admin API Inventory contained no endpoints. Everything in this section was worked out directly between the developer and the client's representative — first informally for salon approval, then formalized in `docs/ADMIN_CONTRACT.md` (backend repo) for Refunds/Complaints/Reports. Treat this section as authoritative for what's actually built; expect more to be added the same way over time.
 
@@ -165,5 +165,9 @@ Purpose: Review and govern salon registrations — the queue every salon sits in
 
 Purpose: Manual refund decision queue — no automated eligibility check (the cancellation/refund policy is still undecided with the client; every refund is read and decided by hand). Authentication: ADMIN role only. List query: `status=PENDING|APPROVED|PROCESSING|COMPLETED|REJECTED` (optional). List/detail success: refund object with embedded `booking`, `payment`, and `customer` objects (enough context to decide without a second lookup). Approve body `{ "notes"?: string }`; reject body `{ "reason": string }` (required). Both only act on a `PENDING` refund (409 otherwise). Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: admin queue with status filter, confirm dialog on reject (reason required). **Backend note:** "approve" only marks the decision — no money actually moves; there's no payment gateway wired for issuing funds yet (MVP payment is pay-at-salon-style). Notifies the refund's customer by email on either decision.
 
+### POST /complaints (NOT under /admin — Customer or Salon Owner); GET /admin/complaints; GET /admin/complaints/:id; POST /admin/complaints/:id/resolve; POST /admin/complaints/:id/reject — 🟢 Live
+
+Purpose: File a complaint (about a booking, payment, salon, staff member, refund, or something else) and have an admin resolve it. Filing authentication: Customer or Salon Owner. File body `{ "type": "BOOKING"|"PAYMENT"|"SALON"|"STAFF"|"REFUND"|"OTHER", "referenceId"?: "", "description": "" }` — `referenceId` is a single generic ID (whatever `type` points at), optional (e.g. `OTHER` has nothing to reference). Resolution authentication: ADMIN only. List query: `status=OPEN|IN_PROGRESS|REJECTED|RESOLVED` (optional). List/detail success embeds `filedBy` (id/email/fullName) always, plus `linkedBooking` or `linkedPayment` when `type` is `BOOKING`/`PAYMENT` and a `referenceId` is present — other types just show the raw `referenceId`. Resolve body `{ "resolutionNotes": string }` (required); reject body `{ "reason": string }` (required). Both only act on `OPEN`/`IN_PROGRESS` (409 otherwise). Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: filing form behind a "report a problem" entry point; admin queue with status filter and confirm dialogs (both actions require text). Notifies the filer by email on either decision. **Backend note:** `IN_PROGRESS` is a valid status but nothing transitions a complaint into it yet — every complaint currently goes straight from `OPEN` to `RESOLVED`/`REJECTED`.
+
 ### Not built yet
-Complaint filing/resolution and the reports overview are next (`docs/ADMIN_CONTRACT.md`, backend repo) — check back once those ship. Explicitly out of scope for now: settlement creation, coupon/category management, customer strikes.
+The reports overview is next (`docs/ADMIN_CONTRACT.md`, backend repo) — check back once it ships. Explicitly out of scope for now: settlement creation, coupon/category management, customer strikes.
