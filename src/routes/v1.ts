@@ -14,6 +14,7 @@ import adminRoutes from "@/modules/admin/admin.routes";
 import adminRefundRoutes from "@/modules/admin/admin-refund.routes";
 import adminComplaintRoutes from "@/modules/admin/admin-complaint.routes";
 import complaintRoutes from "@/modules/complaint/complaint.routes";
+import adminReportRoutes from "@/modules/admin/admin-report.routes";
 
 const router = Router();
 
@@ -32,6 +33,7 @@ router.use("/admin", adminRoutes);
 router.use("/admin/refunds", adminRefundRoutes);
 router.use("/admin/complaints", adminComplaintRoutes);
 router.use("/complaints", complaintRoutes);
+router.use("/admin/reports", adminReportRoutes);
 
 // Additional module routers are mounted here as each module is implemented:
 // ...

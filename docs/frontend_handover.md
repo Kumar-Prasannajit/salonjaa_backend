@@ -15,7 +15,7 @@ This whole document describes the target contract. Only the sections marked **�
 | Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
 | Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
 | Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) |
-| Admin | Module 9 — Admin | 🟡 Partial — salon approval, refunds, and complaints are 🟢 Live; reports overview next, everything else ⚪ Not built |
+| Admin | Module 9 — Admin | 🟡 Partial — salon approval, refunds, complaints, and reports are all 🟢 Live (docs/ADMIN_CONTRACT.md fully implemented); everything else ⚪ Not built |
 
 A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo — but it was only ever generated for Modules 1-4 and hasn't been kept in sync since (by explicit choice, not an oversight). Don't treat it as covering everything marked 🟢 Live above.
 
@@ -153,7 +153,7 @@ Purpose: Read review detail/listings. Authentication: not specified; treat as pu
 
 Purpose: Report review or salon-owner reply. Authentication: report Customer or Salon Owner; reply owning Salon Owner. Report body `{ "reason":"" }`; reply body `{ "message":"" }`. Validation: reviewer identity/ownership; response contracts not supplied. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: confirm report, lock reply submit while pending, update thread on success.
 
-## Admin — 🟡 Partial (Module 9 — salon approval + refunds + complaints so far)
+## Admin — 🟡 Partial (Module 9 — salon approval + refunds + complaints + reports)
 
 The originally supplied Admin API Inventory contained no endpoints. Everything in this section was worked out directly between the developer and the client's representative — first informally for salon approval, then formalized in `docs/ADMIN_CONTRACT.md` (backend repo) for Refunds/Complaints/Reports. Treat this section as authoritative for what's actually built; expect more to be added the same way over time.
 
@@ -169,5 +169,9 @@ Purpose: Manual refund decision queue — no automated eligibility check (the ca
 
 Purpose: File a complaint (about a booking, payment, salon, staff member, refund, or something else) and have an admin resolve it. Filing authentication: Customer or Salon Owner. File body `{ "type": "BOOKING"|"PAYMENT"|"SALON"|"STAFF"|"REFUND"|"OTHER", "referenceId"?: "", "description": "" }` — `referenceId` is a single generic ID (whatever `type` points at), optional (e.g. `OTHER` has nothing to reference). Resolution authentication: ADMIN only. List query: `status=OPEN|IN_PROGRESS|REJECTED|RESOLVED` (optional). List/detail success embeds `filedBy` (id/email/fullName) always, plus `linkedBooking` or `linkedPayment` when `type` is `BOOKING`/`PAYMENT` and a `referenceId` is present — other types just show the raw `referenceId`. Resolve body `{ "resolutionNotes": string }` (required); reject body `{ "reason": string }` (required). Both only act on `OPEN`/`IN_PROGRESS` (409 otherwise). Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: filing form behind a "report a problem" entry point; admin queue with status filter and confirm dialogs (both actions require text). Notifies the filer by email on either decision. **Backend note:** `IN_PROGRESS` is a valid status but nothing transitions a complaint into it yet — every complaint currently goes straight from `OPEN` to `RESOLVED`/`REJECTED`.
 
+### GET /admin/reports/overview — 🟢 Live
+
+Purpose: A minimal admin dashboard aggregate — not a BI tool, no charts/time-series/export. Authentication: ADMIN only. Query: `from`, `to` (both optional `YYYY-MM-DD`, default last 30 days). Success: `{ "totalBookings":0, "completedBookings":0, "cancelledBookings":0, "totalSalons":0, "verifiedSalons":0, "pendingSalons":0, "totalRevenue":0, "openComplaints":0, "pendingRefunds":0 }`. Errors: `400`, `401`, `403`, `500`. Frontend: simple stat-card grid, a date-range picker for the from/to fields. **Backend note:** `from`/`to` only affects `totalBookings`/`completedBookings`/`cancelledBookings`/`totalRevenue` (activity within that window). `totalSalons`/`verifiedSalons`/`pendingSalons`/`openComplaints`/`pendingRefunds` are always the current live count, regardless of the date range — these are queue depths ("how many right now"), not period activity.
+
 ### Not built yet
-The reports overview is next (`docs/ADMIN_CONTRACT.md`, backend repo) — check back once it ships. Explicitly out of scope for now: settlement creation, coupon/category management, customer strikes.
+`docs/ADMIN_CONTRACT.md` (backend repo) is now fully implemented. Explicitly out of scope until a new contract exists: settlement creation, coupon/category management, customer strikes.
