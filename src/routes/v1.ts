@@ -15,6 +15,8 @@ import adminRefundRoutes from "@/modules/admin/admin-refund.routes";
 import adminComplaintRoutes from "@/modules/admin/admin-complaint.routes";
 import complaintRoutes from "@/modules/complaint/complaint.routes";
 import adminReportRoutes from "@/modules/admin/admin-report.routes";
+import publicBranchRoutes from "@/modules/browse/public-branch.routes";
+import serviceCategoryRoutes from "@/modules/browse/service-category.routes";
 
 const router = Router();
 
@@ -34,6 +36,8 @@ router.use("/admin/refunds", adminRefundRoutes);
 router.use("/admin/complaints", adminComplaintRoutes);
 router.use("/complaints", complaintRoutes);
 router.use("/admin/reports", adminReportRoutes);
+router.use("/public/branches", publicBranchRoutes);
+router.use("/service-categories", serviceCategoryRoutes);
 
 // Additional module routers are mounted here as each module is implemented:
 // ...

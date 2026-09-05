@@ -12,6 +12,7 @@ This whole document describes the target contract. Only the sections marked **�
 | User and Address | Module 2 — User + Address | 🟢 Live (except `GET /users/me/bookings` — see note under that endpoint) |
 | Salon and Branch | Module 3 — Salon + Branch | 🟢 Live |
 | Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
+| Public Browse | Module 10 — Public Salon/Branch Browse | 🟢 Live |
 | Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
 | Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
 | Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) |
@@ -90,6 +91,25 @@ Purpose: Create/list/get/update/disable branch services. Authentication: owning 
 ### POST /services/:id/staff; DELETE /services/:id/staff/:staffId
 
 Purpose: Assign/remove a staff member for a service. Authentication: owning Salon Owner. POST body: `{ "staffId":"" }`; DELETE path has both IDs. Validation: service and staff must belong to same owned branch. Errors: `400`, `401`, `403`, `404`, `409`, `500`. Frontend: disable duplicates and refresh available-staff lists.
+
+## Public Browse — 🟢 Live (Module 10 — Public Salon/Branch Browse)
+
+This section didn't exist in the original API Inventory — it was co-defined starting from `docs/PROPOSED_PUBLIC_BROWSE_CONTRACT.md` (frontend repo), the same "draft it, then build it together" process Admin used. It unblocks Home, Explore, Salon Details, and Select Services, which previously had nothing to call (every prior salon/branch/service read was Salon-Owner-scoped).
+
+### GET /public/branches — 🟢 Live
+
+Purpose: Search/list branches for Home ("Popular Near You") and Explore/Nearby Salons. Authentication: Public — browsing stays fully anonymous through Checkout, where `POST /bookings`'s existing Customer auth requirement first applies (unchanged). Query: `city?`, `q?` (free-text over salon/branch name), `serviceCategoryId?`, `lat?`+`lng?` (must be supplied together, and are required when `sort=distance`), `sort?` (`distance|rating|popular`, default `popular`). Success: `[{ "branchId":"", "salonId":"", "salonName":"", "branchName":"", "city":"", "addressLine1":"", "coverImage":null, "distanceKm":0.8, "averageRating":4.8, "reviewCount":512 }]` — bare array, no envelope. Errors: `400`, `500`. Frontend: list skeleton, "no salons found" empty state, debounce `q`. **Backend notes:** (1) the proposal's `area` field doesn't exist — `branches` has no such column, only `addressLine1`/`addressLine2`/`city`/`state`/`postalCode`; use `addressLine1` for the secondary location line. (2) `distanceKm` is only present when `lat`+`lng` were supplied, computed via plain Haversine (no Google Maps, matches the existing location decision), not persisted/cached. (3) Only a `VERIFIED` + `ACTIVE` salon's `ACTIVE` branches ever appear — same "bookable" gate `GET /availability/slots` already enforces. (4) No pagination (same precedent as the Reviews listing endpoints).
+
+### GET /public/branches/:branchId — 🟢 Live
+
+Purpose: Salon Details screen, service menu embedded for Select Services. Authentication: Public. Success: `{ "branchId":"", "salonId":"", "salonName":"", "branchName":"", "description":"", "coverImage":null, "gallery":[], "city":"", "addressLine1":"", "latitude":0, "longitude":0, "verificationStatus":"VERIFIED", "averageRating":4.8, "reviewCount":512, "openingTime":"09:00", "closingTime":"21:00", "services":[{ "id":"", "categoryId":"", "categoryName":"", "name":"", "durationMinutes":45, "basePrice":499, "imageUrl":null }] }` — bare object, no envelope. Errors: `404` (not found, or found but not `VERIFIED`/`ACTIVE` — same non-leaking 404 as an owner requesting a branch they don't own), `500`. Frontend: skeleton detail, only list `services` with `status=ACTIVE`. **Backend note:** `gallery` is always `[]` — `salon_gallery_images` doesn't exist yet (deferred since Module 3, still no contract); the field is present so this doesn't need a breaking shape change whenever that ships.
+
+### GET /service-categories — 🟢 Live
+
+Purpose: "Top Services" chips (Home) and the category filter row (Select Services). Authentication: Public. Success: `[{ "id":"", "name":"Haircut", "icon":null }]` — bare array. Errors: `500`. Frontend: static-ish list, safe to cache client-side for the session. **Backend note:** backing data is `npm run db:seed`'s 8 starter categories (Module 4) — there's still no category CRUD endpoint anywhere; this is only the first read route over that existing data.
+
+### Not proposed / explicitly out of scope for this section
+Per `docs/PROPOSED_PUBLIC_BROWSE_CONTRACT.md`'s own scope call: no discount/promo badge (no source of truth), no favourites/wishlist (`context.md` Pending Decision), no coupon/offers browsing (only `POST /payments/coupons/validate` exists — see the Payment section's coupon note).
 
 ## Availability and Booking — 🟢 Live (Module 5 — Availability, Module 6 — Booking)
 
