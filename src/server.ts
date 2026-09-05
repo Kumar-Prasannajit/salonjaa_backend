@@ -9,6 +9,8 @@ import { startBookingCompletionWorker, stopBookingCompletionWorker } from "@/que
 import { closeBookingCompletionQueue } from "@/queues/booking-completion.queue";
 import { startNotificationSendWorker, stopNotificationSendWorker } from "@/queues/notification-send.worker";
 import { closeNotificationSendQueue } from "@/queues/notification-send.queue";
+import { startPaymentExpiryWorker, stopPaymentExpiryWorker } from "@/queues/payment-expiry.worker";
+import { closePaymentExpiryQueue } from "@/queues/payment-expiry.queue";
 
 async function main(): Promise<void> {
   await checkDatabaseConnection();
@@ -22,6 +24,7 @@ async function main(): Promise<void> {
   startBookingExpiryWorker();
   startBookingCompletionWorker();
   startNotificationSendWorker();
+  startPaymentExpiryWorker();
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
@@ -32,6 +35,8 @@ async function main(): Promise<void> {
       await closeBookingCompletionQueue();
       await stopNotificationSendWorker();
       await closeNotificationSendQueue();
+      await stopPaymentExpiryWorker();
+      await closePaymentExpiryQueue();
       await closeDatabaseConnection();
       await closeRedisConnection();
       process.exit(0);

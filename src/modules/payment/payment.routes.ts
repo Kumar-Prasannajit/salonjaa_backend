@@ -64,6 +64,18 @@ router.post(
   asyncHandler((req, res) => controller.validateCoupon(req, res))
 );
 
+// Module 13 — lets the frontend's Razorpay `ondismiss` handler cancel a still-PENDING
+// attempt immediately, so create-order becomes retryable without waiting for the automatic
+// PAYMENT_ORDER_EXPIRY_MINUTES backstop. Registered before the fixed-path GET /:paymentId
+// below for the same "don't let :paymentId shadow a more specific route" reason as elsewhere
+// in this file — though as a POST it can't actually collide with that GET regardless.
+router.post(
+  "/:paymentId/cancel",
+  requireRole(ROLE_NAMES.CUSTOMER),
+  validate({ params: paymentIdParamSchema }),
+  asyncHandler((req, res) => controller.cancel(req, res))
+);
+
 // Detail: payment's own customer, owning Salon Owner, or Admin — enforced in the service.
 // Registered last so it doesn't shadow the fixed-path routes above.
 router.get(

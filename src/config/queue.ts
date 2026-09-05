@@ -24,4 +24,9 @@ export const QUEUE_NAMES = {
   PROMOTION_DEACTIVATE: "promotion.deactivate",
   PAYMENT_PROVIDER_EVENT: "payment.provider-event",
   REFUND_PROCESS: "refund.process",
+  // Not in the TRD's original job list — added (Module 13) so a payment left PENDING forever
+  // (Razorpay widget closed without completing, no webhook) doesn't permanently block
+  // create-order's "only a FAILED payment can be retried" rule. Same delayed-job mechanism as
+  // BOOKING_EXPIRE.
+  PAYMENT_EXPIRE: "payment.expire",
 } as const;

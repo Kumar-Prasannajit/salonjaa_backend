@@ -49,6 +49,13 @@ const envSchema = z.object({
 
   BOOKING_DEFAULT_EXPIRY_HOURS: z.coerce.number().int().positive().default(12),
 
+  // Module 13 — a payment left PENDING forever (Razorpay widget closed without completing,
+  // no webhook to tell us) permanently blocked create-order's "only a FAILED payment can be
+  // retried" rule. This is a provisional numeric policy, same category as
+  // BOOKING_DEFAULT_EXPIRY_HOURS — the client hasn't specified an exact timeout, chosen to be
+  // generous enough for a real checkout attempt. Revisit if given a real number.
+  PAYMENT_ORDER_EXPIRY_MINUTES: z.coerce.number().int().positive().default(20),
+
   // Razorpay: optional at boot (like SMTP) so the app still starts before keys are supplied —
   // the Payment module throws a clear runtime error if a payment endpoint is hit without them.
   // Only the client-driven create-order/verify flow is documented (frontend_handover.md); no

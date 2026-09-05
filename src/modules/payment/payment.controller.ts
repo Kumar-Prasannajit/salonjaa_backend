@@ -16,6 +16,13 @@ export class PaymentController {
     res.status(200).json(result);
   }
 
+  /** POST /payments/:paymentId/cancel -> default envelope (new endpoint, not pinned by an
+   *  existing literal contract, so CONVENTIONS.md's default applies). */
+  async cancel(req: Request, res: Response): Promise<void> {
+    const payment = await paymentService.cancelPendingPayment(req.user!.id, req.params.paymentId);
+    res.status(200).json({ success: true, data: payment });
+  }
+
   async getDetail(req: Request, res: Response): Promise<void> {
     const payment = await paymentService.getDetail(req.user!.id, req.user!.roles, req.params.paymentId);
     res.status(200).json({ success: true, data: payment });

@@ -15,6 +15,8 @@ import { paymentProvider } from "@/providers/payment";
 import { BadRequestError, ConflictError, NotFoundError, UnprocessableEntityError } from "@/shared/errors";
 import { assertCouponEligible, computeCouponDiscount } from "@/shared/coupon";
 import { ROLE_NAMES } from "@/shared/constants";
+import { env } from "@/config/env";
+import { schedulePaymentExpiry } from "@/queues/payment-expiry.queue";
 import { payments, refunds, settlements } from "@/db/schema";
 
 type PaymentRow = typeof payments.$inferSelect;
@@ -69,6 +71,12 @@ export class PaymentService {
       status: "PENDING",
     });
 
+    // Module 13 — without this, a customer who closes the Razorpay widget without completing
+    // (no webhook ever tells us) leaves this payment PENDING forever, and create-order's
+    // "only a FAILED payment can be retried" rule permanently blocks a retry. See
+    // cancelPendingPayment() below for the immediate/explicit counterpart to this backstop.
+    await schedulePaymentExpiry(payment.id, env.PAYMENT_ORDER_EXPIRY_MINUTES * 60 * 1000);
+
     return { orderId: order.orderId, amount: order.amount, currency: order.currency };
   }
 
@@ -102,6 +110,33 @@ export class PaymentService {
       throw new BadRequestError("Payment signature verification failed");
     }
     return { success: true, paymentStatus: "SUCCESS" };
+  }
+
+  /**
+   * Module 13's second, immediate half of the "stale PENDING payment" fix — the explicit
+   * counterpart to the automatic expiry job scheduled in createOrder(). Lets the frontend's
+   * Razorpay `ondismiss` handler (checkout widget closed without completing) cancel the
+   * attempt right away rather than waiting out PAYMENT_ORDER_EXPIRY_MINUTES, so create-order
+   * becomes retryable immediately.
+   */
+  async cancelPendingPayment(userId: string, paymentId: string): Promise<PaymentDTO> {
+    const payment = await this.repo.findById(paymentId);
+    if (!payment || payment.customerId !== userId) {
+      throw new NotFoundError("Payment not found");
+    }
+    if (payment.status !== "PENDING") {
+      throw new ConflictError("Only a pending payment can be cancelled");
+    }
+
+    const updated = await this.repo.updateStatus(payment.id, "FAILED", {});
+    await this.repo.createTransaction({
+      paymentId: payment.id,
+      provider: payment.provider,
+      providerOrderId: payment.providerOrderId,
+      status: "FAILED",
+    });
+
+    return this.toPaymentDTO(updated);
   }
 
   async getDetail(userId: string, roles: string[], paymentId: string): Promise<PaymentDTO> {
