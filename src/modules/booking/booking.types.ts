@@ -81,6 +81,21 @@ export interface BookingDTO {
   expiredAt: string | null;
   createdAt: string;
   services?: BookingServiceLine[];
+  // Resolved server-side at query time — see docs/PROGRESS.md's "booking responses have no
+  // resolved names" note. salonId/branchId/selectedStaffId above are unchanged (still raw
+  // UUIDs); these are purely additive so nothing that already reads this DTO breaks.
+  salonName: string | null;
+  branchName: string | null;
+  city: string | null;
+  staffName: string | null;
+}
+
+/** Denormalized names resolved for one booking, keyed by bookingId when resolving in bulk. */
+export interface BookingNames {
+  salonName: string | null;
+  branchName: string | null;
+  city: string | null;
+  staffName: string | null;
 }
 
 export interface RescheduleRequestDTO {

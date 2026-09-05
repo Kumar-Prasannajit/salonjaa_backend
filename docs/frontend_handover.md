@@ -127,7 +127,7 @@ Purpose: Create pending customer booking and immediately reserve capacity. Authe
 
 ### GET /bookings/:id; GET /bookings/my-bookings — 🟢 Live
 
-Purpose: Booking detail/history. Authentication: detail: Customer owner, owning Salon Owner, or Admin; history: Customer. History query: `status=PENDING|APPROVED|CANCELLED|COMPLETED`. Detail success: `{ "booking": {} }`. Errors: `401`, `403`, `404`, `500`. Frontend: skeleton detail/history and status-specific empty state.
+Purpose: Booking detail/history. Authentication: detail: Customer owner, owning Salon Owner, or Admin; history: Customer. History query: `status=PENDING|APPROVED|CANCELLED|COMPLETED`. Detail success: `{ "booking": {} }`. Errors: `401`, `403`, `404`, `500`. Frontend: skeleton detail/history and status-specific empty state. **Backend note (Module 11):** the booking object on both endpoints now also carries resolved `salonName`, `branchName`, `city` (all always populated), and `staffName` (populated only when `selectedStaffId` is set, otherwise `null`) — resolved server-side, no extra lookups needed to render `components/booking-card.tsx`'s salon name/stylist. `salonId`/`branchId`/`selectedStaffId` are unchanged. This resolution is **not** applied to the mutation-confirmation responses (`cancel`/`approve`/`reject`/`approve-reschedule`/`walk-in`) — those 4 fields come back `null` there; only the two read endpoints above resolve names.
 
 ### POST /bookings/:id/cancel — 🟢 Live (provisional policy)
 

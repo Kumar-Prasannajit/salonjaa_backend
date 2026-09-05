@@ -7,6 +7,7 @@ import { NotificationService } from "@/modules/notification/notification.service
 import {
   ApproveBookingInput,
   BookingDTO,
+  BookingNames,
   BookingServiceLine,
   CreateBookingInput,
   ProposeRescheduleInput,
@@ -101,12 +102,14 @@ export class BookingService {
       await this.salonService.assertOwned(userId, booking.salonId);
     }
     const services = await this.repo.findServicesForBooking(bookingId);
-    return this.toDTO(booking, services);
+    const names = await this.repo.findNamesForBookings([booking]);
+    return this.toDTO(booking, services, names.get(booking.id));
   }
 
   async listMyBookings(userId: string, status?: string): Promise<BookingDTO[]> {
     const rows = await this.repo.listByCustomer(userId, status);
-    return rows.map((r) => this.toDTO(r));
+    const names = await this.repo.findNamesForBookings(rows);
+    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
   }
 
   async listSalonBookings(userId: string, status?: string): Promise<BookingDTO[]> {
@@ -115,7 +118,8 @@ export class BookingService {
       salons.map((s) => s.id),
       status
     );
-    return rows.map((r) => this.toDTO(r));
+    const names = await this.repo.findNamesForBookings(rows);
+    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
   }
 
   /**
@@ -569,7 +573,7 @@ export class BookingService {
     return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
   }
 
-  private toDTO(booking: BookingRow, services?: BookingServiceRow[]): BookingDTO {
+  private toDTO(booking: BookingRow, services?: BookingServiceRow[], names?: BookingNames): BookingDTO {
     return {
       id: booking.id,
       bookingNumber: booking.bookingNumber,
@@ -604,6 +608,10 @@ export class BookingService {
         quantity: s.quantity,
         totalAmount: s.totalAmount,
       })),
+      salonName: names?.salonName ?? null,
+      branchName: names?.branchName ?? null,
+      city: names?.city ?? null,
+      staffName: names?.staffName ?? null,
     };
   }
 

@@ -1,9 +1,9 @@
 import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/config/database";
-import { bookings, bookingServices, bookingStatusHistory, bookingRescheduleRequests } from "@/db/schema";
+import { bookings, bookingServices, bookingStatusHistory, bookingRescheduleRequests, salons, branches, staff } from "@/db/schema";
 import { CAPACITY_CONSUMING_BOOKING_STATUSES } from "@/shared/constants";
 import { ConflictError } from "@/shared/errors";
-import { BookingServiceLine } from "@/modules/booking/booking.types";
+import { BookingNames, BookingServiceLine } from "@/modules/booking/booking.types";
 
 interface CreateBookingParams {
   bookingNumber: string;
@@ -32,6 +32,51 @@ export class BookingRepository {
 
   async findServicesForBooking(bookingId: string) {
     return db.select().from(bookingServices).where(eq(bookingServices.bookingId, bookingId));
+  }
+
+  /**
+   * Resolves salonName/branchName/city/staffName for a batch of bookings in three bulk
+   * queries (never N+1), keyed by bookingId. Used by both getDetail (a 1-element batch) and
+   * listMyBookings/listSalonBookings — see docs/PROGRESS.md's "booking responses have no
+   * resolved names" note. A booking whose salon/branch/staff row is somehow missing (should
+   * never happen — these are `restrict`-on-delete FKs) resolves that one field to null rather
+   * than throwing, since this is display-only enrichment, not the booking's own data.
+   */
+  async findNamesForBookings(rows: (typeof bookings.$inferSelect)[]): Promise<Map<string, BookingNames>> {
+    const salonIds = [...new Set(rows.map((r) => r.salonId))];
+    const branchIds = [...new Set(rows.map((r) => r.branchId))];
+    const staffIds = [...new Set(rows.map((r) => r.selectedStaffId).filter((id): id is string => id !== null))];
+
+    const [salonRows, branchRows, staffRows] = await Promise.all([
+      salonIds.length
+        ? db.select({ id: salons.id, name: salons.name }).from(salons).where(inArray(salons.id, salonIds))
+        : Promise.resolve([]),
+      branchIds.length
+        ? db
+            .select({ id: branches.id, name: branches.name, city: branches.city })
+            .from(branches)
+            .where(inArray(branches.id, branchIds))
+        : Promise.resolve([]),
+      staffIds.length
+        ? db.select({ id: staff.id, fullName: staff.fullName }).from(staff).where(inArray(staff.id, staffIds))
+        : Promise.resolve([]),
+    ]);
+
+    const salonMap = new Map(salonRows.map((s) => [s.id, s.name]));
+    const branchMap = new Map(branchRows.map((b) => [b.id, { name: b.name, city: b.city }]));
+    const staffMap = new Map(staffRows.map((s) => [s.id, s.fullName]));
+
+    const result = new Map<string, BookingNames>();
+    for (const r of rows) {
+      const branch = branchMap.get(r.branchId);
+      result.set(r.id, {
+        salonName: salonMap.get(r.salonId) ?? null,
+        branchName: branch?.name ?? null,
+        city: branch?.city ?? null,
+        staffName: r.selectedStaffId ? staffMap.get(r.selectedStaffId) ?? null : null,
+      });
+    }
+    return result;
   }
 
   async listByCustomer(customerId: string, status?: string) {
