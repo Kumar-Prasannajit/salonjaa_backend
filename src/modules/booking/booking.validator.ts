@@ -18,6 +18,7 @@ export const createBookingSchema = z.object({
   bookingDate: dateSchema,
   slotId: slotIdSchema,
   notes: z.string().trim().max(1000).optional(),
+  couponCode: z.string().trim().min(1, "couponCode cannot be empty").max(50).optional(),
 });
 
 export const bookingIdParamSchema = z.object({

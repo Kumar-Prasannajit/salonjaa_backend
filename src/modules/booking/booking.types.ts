@@ -6,6 +6,11 @@ export interface CreateBookingInput {
   bookingDate: string; // YYYY-MM-DD
   slotId: string; // "HH:MM-HH:MM"
   notes?: string;
+  // Module 12 — see docs/PROGRESS.md's "coupon can never attach to a booking" note. Validated
+  // and, if eligible, snapshotted into bookings.discountAmount at creation time; invalid/
+  // expired/exhausted/below-minimum codes throw 422 (same as POST /payments/coupons/validate)
+  // rather than silently creating an undiscounted booking.
+  couponCode?: string;
 }
 
 export interface CancelBookingInput {

@@ -1,9 +1,27 @@
-import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/config/database";
-import { bookings, bookingServices, bookingStatusHistory, bookingRescheduleRequests, salons, branches, staff } from "@/db/schema";
+import {
+  bookings,
+  bookingServices,
+  bookingStatusHistory,
+  bookingRescheduleRequests,
+  bookingCoupons,
+  couponUsages,
+  coupons,
+  salons,
+  branches,
+  staff,
+} from "@/db/schema";
 import { CAPACITY_CONSUMING_BOOKING_STATUSES } from "@/shared/constants";
 import { ConflictError } from "@/shared/errors";
 import { BookingNames, BookingServiceLine } from "@/modules/booking/booking.types";
+
+interface AppliedCoupon {
+  couponId: string;
+  couponCode: string;
+  couponType: "FIXED" | "PERCENTAGE";
+  discountAmount: number;
+}
 
 interface CreateBookingParams {
   bookingNumber: string;
@@ -22,11 +40,30 @@ interface CreateBookingParams {
   notes: string | null;
   services: BookingServiceLine[];
   changedByUserId: string | null;
+  // Already validated + priced by the service before this is called (see
+  // BookingService.create) — the repository only writes what it's given, per convention
+  // (repositories never validate/throw AppError). Optional: only present when the request
+  // carried a couponCode.
+  coupon?: AppliedCoupon;
 }
 
 export class BookingRepository {
   async findById(bookingId: string) {
     const [row] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+    return row ?? null;
+  }
+
+  /**
+   * Own copy of the same lookup PaymentRepository.findActiveCouponByCode already has —
+   * deliberately not reused across modules, same precedent as Module 9b's admin-refund.*
+   * querying directly rather than reusing PaymentRepository.
+   */
+  async findActiveCouponByCode(code: string) {
+    const [row] = await db
+      .select()
+      .from(coupons)
+      .where(and(eq(coupons.couponCode, code), eq(coupons.active, true), isNull(coupons.deletedAt)))
+      .limit(1);
     return row ?? null;
   }
 
@@ -131,6 +168,8 @@ export class BookingRepository {
       }
 
       const subtotalAmount = params.services.reduce((sum, s) => sum + s.totalAmount, 0);
+      const discountAmount = params.coupon?.discountAmount ?? 0;
+      const totalAmount = subtotalAmount - discountAmount;
 
       const [booking] = await tx
         .insert(bookings)
@@ -148,9 +187,9 @@ export class BookingRepository {
           scheduledEnd: params.scheduledEnd,
           totalDurationMinutes: params.totalDurationMinutes,
           subtotalAmount,
-          discountAmount: 0,
+          discountAmount,
           taxAmount: 0,
-          totalAmount: subtotalAmount,
+          totalAmount,
           notes: params.notes,
           approvedAt: params.bookingStatus === "APPROVED" ? new Date() : null,
         })
@@ -168,6 +207,29 @@ export class BookingRepository {
             totalAmount: s.totalAmount,
           }))
         );
+      }
+
+      // First real writer of booking_coupons/coupon_usages — both tables existed since
+      // Module 7 with zero consumers (POST /bookings had no couponCode field). See
+      // docs/PROGRESS.md's "coupon can never attach to a booking" note (Module 12).
+      if (params.coupon) {
+        await tx.insert(bookingCoupons).values({
+          bookingId: booking.id,
+          couponCode: params.coupon.couponCode,
+          couponType: params.coupon.couponType,
+          discountAmount: params.coupon.discountAmount,
+          appliedAmount: totalAmount,
+        });
+        await tx.insert(couponUsages).values({
+          couponId: params.coupon.couponId,
+          bookingId: booking.id,
+          customerId: params.customerId,
+          discountAmount: params.coupon.discountAmount,
+        });
+        await tx
+          .update(coupons)
+          .set({ usedCount: sql`${coupons.usedCount} + 1`, updatedAt: new Date() })
+          .where(eq(coupons.id, params.coupon.couponId));
       }
 
       await tx.insert(bookingStatusHistory).values({

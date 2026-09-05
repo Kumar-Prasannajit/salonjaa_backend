@@ -13,6 +13,7 @@ import {
 } from "@/modules/payment/payment.types";
 import { paymentProvider } from "@/providers/payment";
 import { BadRequestError, ConflictError, NotFoundError, UnprocessableEntityError } from "@/shared/errors";
+import { assertCouponEligible, computeCouponDiscount } from "@/shared/coupon";
 import { ROLE_NAMES } from "@/shared/constants";
 import { payments, refunds, settlements } from "@/db/schema";
 
@@ -187,27 +188,10 @@ export class PaymentService {
     if (!coupon) {
       throw new UnprocessableEntityError("Coupon not found or inactive");
     }
-    const now = new Date();
-    if (coupon.startsAt && coupon.startsAt > now) {
-      throw new UnprocessableEntityError("Coupon is not active yet");
-    }
-    if (coupon.expiresAt && coupon.expiresAt < now) {
-      throw new UnprocessableEntityError("Coupon has expired");
-    }
-    if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
-      throw new UnprocessableEntityError("Coupon usage limit reached");
-    }
-    if (coupon.minimumAmount !== null && input.bookingAmount < coupon.minimumAmount) {
-      throw new UnprocessableEntityError(`Minimum booking amount of ${coupon.minimumAmount} required for this coupon`);
-    }
-
-    let discount = coupon.type === "FIXED" ? coupon.value : (input.bookingAmount * coupon.value) / 100;
-    if (coupon.maxDiscount !== null) {
-      discount = Math.min(discount, coupon.maxDiscount);
-    }
-    discount = Math.min(discount, input.bookingAmount);
-
-    return { valid: true, discount: Math.round(discount * 100) / 100 };
+    // Shared with BookingService's coupon attach (Module 12) — see src/shared/coupon.ts.
+    assertCouponEligible(coupon, input.bookingAmount);
+    const discount = computeCouponDiscount(coupon, input.bookingAmount);
+    return { valid: true, discount };
   }
 
   private toPaymentDTO(payment: PaymentRow): PaymentDTO {

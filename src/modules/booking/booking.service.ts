@@ -15,7 +15,8 @@ import {
   RescheduleRequestInput,
   WalkInInput,
 } from "@/modules/booking/booking.types";
-import { BadRequestError, ConflictError, NotFoundError } from "@/shared/errors";
+import { BadRequestError, ConflictError, NotFoundError, UnprocessableEntityError } from "@/shared/errors";
+import { assertCouponEligible, computeCouponDiscount } from "@/shared/coupon";
 import { generateBookingNumber } from "@/shared/crypto";
 import { CAPACITY_CONSUMING_BOOKING_STATUSES, ROLE_NAMES } from "@/shared/constants";
 import { env } from "@/config/env";
@@ -63,6 +64,8 @@ export class BookingService {
       branch.totalChairs
     );
 
+    const coupon = input.couponCode ? await this.resolveCoupon(input.couponCode, lines) : undefined;
+
     const booking = await this.createWithRetry({
       customerId: userId,
       customerName: null,
@@ -79,6 +82,7 @@ export class BookingService {
       notes: input.notes ?? null,
       services: lines,
       changedByUserId: userId,
+      coupon,
     });
 
     await scheduleBookingExpiry(booking.id, env.BOOKING_DEFAULT_EXPIRY_HOURS * 60 * 60 * 1000);
@@ -412,6 +416,33 @@ export class BookingService {
 
   // ---- Shared internals ----
 
+  /**
+   * Validated eagerly, before the booking transaction opens — matches
+   * PaymentService.validateCoupon's existing eligibility rules exactly (shared via
+   * src/shared/coupon.ts) rather than re-deriving them. Throws 422 on any ineligibility, so
+   * an invalid/expired/exhausted/below-minimum code never silently creates an undiscounted
+   * booking.
+   *
+   * Known gap, flagged rather than silently accepted: `usageLimit` isn't re-checked inside
+   * the booking's own transaction (repositories don't throw AppError, per CONVENTIONS.md, so
+   * a fresh in-transaction re-validation doesn't fit cleanly) — under high concurrent load a
+   * coupon could theoretically be used one or two times past its limit. Same "MVP, revisit if
+   * it matters" treatment as this module's other provisional policies.
+   */
+  private async resolveCoupon(
+    couponCode: string,
+    lines: BookingServiceLine[]
+  ): Promise<{ couponId: string; couponCode: string; couponType: "FIXED" | "PERCENTAGE"; discountAmount: number }> {
+    const coupon = await this.repo.findActiveCouponByCode(couponCode);
+    if (!coupon) {
+      throw new UnprocessableEntityError("Coupon not found or inactive");
+    }
+    const subtotalAmount = lines.reduce((sum, l) => sum + l.totalAmount, 0);
+    assertCouponEligible(coupon, subtotalAmount);
+    const discountAmount = computeCouponDiscount(coupon, subtotalAmount);
+    return { couponId: coupon.id, couponCode: coupon.couponCode, couponType: coupon.type, discountAmount };
+  }
+
   private isCapacityConsuming(status: string): boolean {
     return (CAPACITY_CONSUMING_BOOKING_STATUSES as readonly string[]).includes(status);
   }
@@ -555,6 +586,7 @@ export class BookingService {
       notes: string | null;
       services: BookingServiceLine[];
       changedByUserId: string | null;
+      coupon?: { couponId: string; couponCode: string; couponType: "FIXED" | "PERCENTAGE"; discountAmount: number };
     },
     attempt = 0
   ): Promise<BookingRow> {
