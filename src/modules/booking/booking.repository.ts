@@ -32,6 +32,8 @@ interface CreateBookingParams {
   branchId: string;
   bookingType: "ONLINE" | "WALK_IN";
   bookingStatus: "PENDING" | "APPROVED";
+  // Module 14b — see PROGRESS.md's Module 14b entry.
+  paymentMethod: "ONLINE" | "PAY_AT_SALON";
   selectedStaffId: string | null;
   scheduledStart: Date;
   scheduledEnd: Date;
@@ -182,6 +184,7 @@ export class BookingRepository {
           branchId: params.branchId,
           bookingType: params.bookingType,
           bookingStatus: params.bookingStatus,
+          paymentMethod: params.paymentMethod,
           selectedStaffId: params.selectedStaffId,
           scheduledStart: params.scheduledStart,
           scheduledEnd: params.scheduledEnd,

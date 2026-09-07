@@ -1,5 +1,11 @@
 import { pgTable, uuid, varchar, text, integer, doublePrecision, timestamp, index } from "drizzle-orm/pg-core";
-import { bookingStatusEnum, bookingTypeEnum, requestedByEnum, rescheduleRequestStatusEnum } from "@/db/schema/enums";
+import {
+  bookingStatusEnum,
+  bookingTypeEnum,
+  requestedByEnum,
+  rescheduleRequestStatusEnum,
+  paymentMethodEnum,
+} from "@/db/schema/enums";
 import { branches } from "@/db/schema/branch";
 import { staff } from "@/db/schema/staff";
 import { salons } from "@/db/schema/salon";
@@ -24,6 +30,10 @@ export const bookings = pgTable(
       .references(() => branches.id, { onDelete: "restrict" }),
     bookingType: bookingTypeEnum("booking_type").notNull().default("ONLINE"),
     bookingStatus: bookingStatusEnum("booking_status").notNull().default("PENDING"),
+    // Module 14b — existing enum (Module 7) that had zero writers until now. Set at creation
+    // time so approve() knows, before the fact, whether this booking should stop at
+    // AWAITING_PAYMENT (ONLINE) or go straight to APPROVED (PAY_AT_SALON) — see PROGRESS.md.
+    paymentMethod: paymentMethodEnum("payment_method").notNull().default("ONLINE"),
     selectedStaffId: uuid("selected_staff_id").references(() => staff.id, { onDelete: "restrict" }),
     scheduledStart: timestamp("scheduled_start", { withTimezone: true }).notNull(),
     scheduledEnd: timestamp("scheduled_end", { withTimezone: true }).notNull(),

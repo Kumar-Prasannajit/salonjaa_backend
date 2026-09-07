@@ -17,6 +17,7 @@ import { assertCouponEligible, computeCouponDiscount } from "@/shared/coupon";
 import { ROLE_NAMES } from "@/shared/constants";
 import { env } from "@/config/env";
 import { schedulePaymentExpiry } from "@/queues/payment-expiry.queue";
+import { scheduleBookingCompletion } from "@/queues/booking-completion.queue";
 import { payments, refunds, settlements } from "@/db/schema";
 
 type PaymentRow = typeof payments.$inferSelect;
@@ -39,11 +40,13 @@ export class PaymentService {
     if (!booking || booking.customerId !== userId) {
       throw new NotFoundError("Booking not found");
     }
-    // Decided with the user: payment only happens once the salon owner has approved the
-    // booking ("if salon owner approves then customer will pay"). The 15-minute payment
-    // window they described isn't enforced here — see docs/PROGRESS.md.
-    if (booking.bookingStatus !== "APPROVED") {
-      throw new ConflictError("Booking must be approved by the salon before payment can be created");
+    // Module 14b — payment can now only be created during the booking's AWAITING_PAYMENT
+    // window (salon approved an ONLINE booking, payment due within
+    // BOOKING_PAYMENT_WINDOW_MINUTES). A PAY_AT_SALON booking never enters AWAITING_PAYMENT,
+    // so it correctly can never reach here either — nothing to pay online. See PROGRESS.md's
+    // Module 14b entry.
+    if (booking.bookingStatus !== "AWAITING_PAYMENT") {
+      throw new ConflictError("Booking must be awaiting payment before an order can be created");
     }
 
     const existing = await this.repo.findActivePaymentForBooking(booking.id);
@@ -109,6 +112,33 @@ export class PaymentService {
     if (!isValid) {
       throw new BadRequestError("Payment signature verification failed");
     }
+
+    // Module 14b — this is the moment an ONLINE booking actually becomes confirmed: the
+    // payment window ends here, not at approve() (see BookingService.approve). The
+    // AWAITING_PAYMENT->CANCELLED expiry job (schedulePaymentWindowExpiry) is left running
+    // rather than explicitly cancelled — same "stale job is a safe no-op" precedent as every
+    // other delayed job in this codebase; it re-checks the booking is still AWAITING_PAYMENT
+    // before acting, so it's now a no-op once this transition lands.
+    const booking = await this.bookingRepo.findById(payment.bookingId);
+    if (booking && booking.bookingStatus === "AWAITING_PAYMENT") {
+      await this.bookingRepo.transitionStatus(
+        booking.id,
+        "AWAITING_PAYMENT",
+        "APPROVED",
+        {},
+        booking.customerId,
+        "Payment received"
+      );
+      await scheduleBookingCompletion(booking.id, booking.scheduledEnd.getTime() - Date.now());
+      if (booking.customerId) {
+        await this.notificationService.notify({
+          userId: booking.customerId,
+          eventType: "BOOKING_APPROVED",
+          data: { bookingNumber: booking.bookingNumber },
+        });
+      }
+    }
+
     return { success: true, paymentStatus: "SUCCESS" };
   }
 

@@ -56,6 +56,12 @@ const envSchema = z.object({
   // generous enough for a real checkout attempt. Revisit if given a real number.
   PAYMENT_ORDER_EXPIRY_MINUTES: z.coerce.number().int().positive().default(20),
 
+  // Module 14b — client's "approve then 15-minute payment window" rule (already referenced
+  // as an unenforced gap since Module 6/7), now actually built. Same provisional-numeric
+  // treatment as the other timing constants above: 15 minutes is the client's own stated
+  // figure (docs/PROGRESS.md's Module 6 note), not a guess.
+  BOOKING_PAYMENT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
+
   // Module 14 — httpOnly-cookie auth (see docs/PROGRESS.md). Cookies are scoped to this
   // domain only; cross-subdomain/cross-origin production deployments would need this set
   // explicitly (and SameSite=None+Secure instead of Lax) — out of scope for MVP's single-origin

@@ -19,6 +19,8 @@ export const createBookingSchema = z.object({
   slotId: slotIdSchema,
   notes: z.string().trim().max(1000).optional(),
   couponCode: z.string().trim().min(1, "couponCode cannot be empty").max(50).optional(),
+  // Module 14b — defaults to ONLINE (service-layer default) when omitted.
+  paymentMethod: z.enum(["ONLINE", "PAY_AT_SALON"]).optional(),
 });
 
 export const bookingIdParamSchema = z.object({
@@ -66,7 +68,7 @@ export const walkInSchema = z.object({
   slotId: slotIdSchema,
 });
 
-const myBookingsStatusEnum = z.enum(["PENDING", "APPROVED", "CANCELLED", "COMPLETED"]);
+const myBookingsStatusEnum = z.enum(["PENDING", "AWAITING_PAYMENT", "APPROVED", "CANCELLED", "COMPLETED"]);
 
 export const myBookingsQuerySchema = z.object({
   status: myBookingsStatusEnum.optional(),

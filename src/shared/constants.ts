@@ -26,4 +26,7 @@ export const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
 // Booking statuses that reserve branch capacity (TRD context.md booking-engine decisions):
 // "pending and approved bookings reserve availability; rejected, expired, cancelled,
 // refunded, and completed bookings do not."
-export const CAPACITY_CONSUMING_BOOKING_STATUSES = ["PENDING", "APPROVED"] as const;
+// Module 14b: AWAITING_PAYMENT also reserves capacity — the slot stays held for the
+// customer during the payment window, same as it did while the status was APPROVED before
+// this module existed.
+export const CAPACITY_CONSUMING_BOOKING_STATUSES = ["PENDING", "APPROVED", "AWAITING_PAYMENT"] as const;

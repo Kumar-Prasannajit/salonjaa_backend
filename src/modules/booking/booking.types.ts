@@ -11,6 +11,9 @@ export interface CreateBookingInput {
   // expired/exhausted/below-minimum codes throw 422 (same as POST /payments/coupons/validate)
   // rather than silently creating an undiscounted booking.
   couponCode?: string;
+  // Module 14b — see PROGRESS.md's Module 14b entry. Defaults to ONLINE (the only path that
+  // existed before this module) when omitted.
+  paymentMethod?: "ONLINE" | "PAY_AT_SALON";
 }
 
 export interface CancelBookingInput {
@@ -69,6 +72,7 @@ export interface BookingDTO {
   branchId: string;
   bookingType: string;
   bookingStatus: string;
+  paymentMethod: string;
   selectedStaffId: string | null;
   scheduledStart: string;
   scheduledEnd: string;

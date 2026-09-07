@@ -29,4 +29,8 @@ export const QUEUE_NAMES = {
   // create-order's "only a FAILED payment can be retried" rule. Same delayed-job mechanism as
   // BOOKING_EXPIRE.
   PAYMENT_EXPIRE: "payment.expire",
+  // Module 14b — the client's "approve then 15-minute payment window" rule. Not in the TRD's
+  // original job list, same "add when a real gap needs it" precedent as BOOKING_COMPLETE/
+  // PAYMENT_EXPIRE. Auto-cancels a booking still AWAITING_PAYMENT once the window lapses.
+  PAYMENT_WINDOW_EXPIRE: "payment-window.expire",
 } as const;

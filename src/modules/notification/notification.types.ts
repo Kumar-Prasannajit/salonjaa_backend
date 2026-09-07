@@ -6,6 +6,9 @@
 export type NotificationEventType =
   | "BOOKING_CREATED"
   | "BOOKING_APPROVED"
+  // Module 14b — see PROGRESS.md's Module 14b entry (AWAITING_PAYMENT booking status).
+  | "BOOKING_AWAITING_PAYMENT"
+  | "BOOKING_PAYMENT_WINDOW_EXPIRED"
   | "BOOKING_REJECTED"
   | "BOOKING_EXPIRED"
   | "BOOKING_CANCELLED"

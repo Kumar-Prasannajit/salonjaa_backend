@@ -71,6 +71,13 @@
       "when": 1788480772919,
       "tag": "0009_cheerful_stepford_cuckoos",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788812182101,
+      "tag": "0010_magical_ultimo",
+      "breakpoints": true
     }
   ]
 }

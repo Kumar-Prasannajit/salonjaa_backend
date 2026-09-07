@@ -22,6 +22,7 @@ import { CAPACITY_CONSUMING_BOOKING_STATUSES, ROLE_NAMES } from "@/shared/consta
 import { env } from "@/config/env";
 import { scheduleBookingExpiry } from "@/queues/booking-expiry.queue";
 import { scheduleBookingCompletion, rescheduleBookingCompletion } from "@/queues/booking-completion.queue";
+import { schedulePaymentWindowExpiry } from "@/queues/payment-window-expiry.queue";
 import { bookings } from "@/db/schema";
 
 type BookingRow = typeof bookings.$inferSelect;
@@ -74,6 +75,7 @@ export class BookingService {
       branchId: input.branchId,
       bookingType: "ONLINE",
       bookingStatus: "PENDING",
+      paymentMethod: input.paymentMethod ?? "ONLINE",
       selectedStaffId: input.staffId ?? null,
       scheduledStart: start,
       scheduledEnd: end,
@@ -276,21 +278,38 @@ export class BookingService {
       }
     }
 
+    // Module 14b — see PROGRESS.md's Module 14b entry. PAY_AT_SALON keeps the pre-existing
+    // behavior exactly (straight to APPROVED, no online payment ever expected). ONLINE now
+    // stops at AWAITING_PAYMENT until the customer actually pays.
+    const payingOnline = booking.paymentMethod === "ONLINE";
+    const nextStatus = payingOnline ? "AWAITING_PAYMENT" : "APPROVED";
+
     const updated = await this.repo.transitionStatus(
       bookingId,
       booking.bookingStatus,
-      "APPROVED",
+      nextStatus,
       { approvedAt: new Date() },
       userId,
       input.notes
     );
 
-    await scheduleBookingCompletion(bookingId, booking.scheduledEnd.getTime() - Date.now());
+    if (payingOnline) {
+      await schedulePaymentWindowExpiry(bookingId, env.BOOKING_PAYMENT_WINDOW_MINUTES * 60 * 1000);
+    } else {
+      // Only a PAY_AT_SALON (or walk-in, which never reaches approve()) booking is actually
+      // confirmed at this point — an ONLINE booking's completion job now waits for payment
+      // success (see PaymentService.verifyPayment).
+      await scheduleBookingCompletion(bookingId, booking.scheduledEnd.getTime() - Date.now());
+    }
+
     if (booking.customerId) {
       await this.notificationService.notify({
         userId: booking.customerId,
-        eventType: "BOOKING_APPROVED",
-        data: { bookingNumber: booking.bookingNumber },
+        eventType: payingOnline ? "BOOKING_AWAITING_PAYMENT" : "BOOKING_APPROVED",
+        data: {
+          bookingNumber: booking.bookingNumber,
+          paymentWindowMinutes: String(env.BOOKING_PAYMENT_WINDOW_MINUTES),
+        },
       });
     }
 
@@ -398,6 +417,9 @@ export class BookingService {
       // No customer-facing approval flow is required for walk-ins, per TRD — go straight to
       // APPROVED rather than PENDING.
       bookingStatus: "APPROVED",
+      // Module 14b — a walk-in is inherently paid at the salon; there's no online-payment UX
+      // for it anywhere in the docs. Explicit rather than relying on the ONLINE default.
+      paymentMethod: "PAY_AT_SALON",
       selectedStaffId: input.staffId,
       scheduledStart: start,
       scheduledEnd: end,
@@ -578,6 +600,7 @@ export class BookingService {
       branchId: string;
       bookingType: "ONLINE" | "WALK_IN";
       bookingStatus: "PENDING" | "APPROVED";
+      paymentMethod: "ONLINE" | "PAY_AT_SALON";
       selectedStaffId: string | null;
       scheduledStart: Date;
       scheduledEnd: Date;
@@ -616,6 +639,7 @@ export class BookingService {
       branchId: booking.branchId,
       bookingType: booking.bookingType,
       bookingStatus: booking.bookingStatus,
+      paymentMethod: booking.paymentMethod,
       selectedStaffId: booking.selectedStaffId,
       scheduledStart: booking.scheduledStart.toISOString(),
       scheduledEnd: booking.scheduledEnd.toISOString(),

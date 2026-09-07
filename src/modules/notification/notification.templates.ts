@@ -17,6 +17,14 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
     subject: "Your Salonjaa booking is confirmed",
     body: `Your booking ${d.bookingNumber} has been approved.`,
   }),
+  BOOKING_AWAITING_PAYMENT: (d) => ({
+    subject: "Your Salonjaa booking is approved — pay to confirm",
+    body: `Your booking ${d.bookingNumber} has been approved. Complete payment within ${d.paymentWindowMinutes} minutes to confirm it, or the booking will be automatically cancelled.`,
+  }),
+  BOOKING_PAYMENT_WINDOW_EXPIRED: (d) => ({
+    subject: "Your Salonjaa booking was cancelled — payment window expired",
+    body: `Your booking ${d.bookingNumber} was automatically cancelled because payment wasn't completed within the ${d.paymentWindowMinutes}-minute window.`,
+  }),
   BOOKING_REJECTED: (d) => ({
     subject: "Your Salonjaa booking was declined",
     body: `Your booking ${d.bookingNumber} was declined by the salon. Reason: ${d.reason ?? "Not specified"}.`,

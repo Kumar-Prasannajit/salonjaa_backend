@@ -27,6 +27,10 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "REFUND_PENDING",
   "REFUNDED",
   "NO_SHOW",
+  // Module 14b — not in the TRD's original enum list (§6). The client's "approve then
+  // 15-minute payment window" rule (docs/PROGRESS.md's Module 6 note) had no state to
+  // represent "approved, payment due, not yet paid" — see PROGRESS.md's Module 14b entry.
+  "AWAITING_PAYMENT",
 ]);
 export const rescheduleRequestStatusEnum = pgEnum("reschedule_request_status", ["PENDING", "ACCEPTED", "REJECTED"]);
 export const requestedByEnum = pgEnum("requested_by", ["CUSTOMER", "SALON"]);
