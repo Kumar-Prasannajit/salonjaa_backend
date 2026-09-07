@@ -56,6 +56,12 @@ const envSchema = z.object({
   // generous enough for a real checkout attempt. Revisit if given a real number.
   PAYMENT_ORDER_EXPIRY_MINUTES: z.coerce.number().int().positive().default(20),
 
+  // Module 14 — httpOnly-cookie auth (see docs/PROGRESS.md). Cookies are scoped to this
+  // domain only; cross-subdomain/cross-origin production deployments would need this set
+  // explicitly (and SameSite=None+Secure instead of Lax) — out of scope for MVP's single-origin
+  // local setup, flagged rather than guessed at.
+  COOKIE_DOMAIN: z.string().optional(),
+
   // Razorpay: optional at boot (like SMTP) so the app still starts before keys are supplied —
   // the Payment module throws a clear runtime error if a payment endpoint is hit without them.
   // Only the client-driven create-order/verify flow is documented (frontend_handover.md); no
