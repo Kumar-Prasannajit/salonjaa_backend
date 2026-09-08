@@ -9,14 +9,15 @@ This whole document describes the target contract. Only the sections marked **�
 | Section below | Backend module | Status |
 |---|---|---|
 | Auth | Module 1 — Foundation + Auth | 🟢 Live |
-| User and Address | Module 2 — User + Address | 🟢 Live (except `GET /users/me/bookings` — see note under that endpoint) |
-| Salon and Branch | Module 3 — Salon + Branch | 🟢 Live |
+| User and Address | Module 2 — User + Address | 🟢 Live — `GET /users/me/bookings` now live too |
+| Salon and Branch | Module 3 — Salon + Branch | 🟢 Live — plus salon media gallery and slot-templates (new, see their own section below) |
 | Staff and Services | Module 4 — Catalogue + Staff | 🟢 Live |
-| Public Browse | Module 10 — Public Salon/Branch Browse | 🟢 Live |
-| Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note) |
-| Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live |
-| Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) |
-| Admin | Module 9 — Admin | 🟡 Partial — salon approval, refunds, complaints, and reports are all 🟢 Live (docs/ADMIN_CONTRACT.md fully implemented); everything else ⚪ Not built |
+| Public Browse | Module 10 — Public Salon/Branch Browse | 🟢 Live — plus public promotions (new, see below) |
+| Availability and Booking | Module 5 — Availability, Module 6 — Booking | 🟢 Live — all endpoints in this section are live except `POST /salon-bookings/:id/block-slot` (explicitly Future Feature — Not MVP, see that endpoint's note). Customer can now respond to a salon-proposed reschedule (see below); `POST /salon-bookings/:id/no-show` is new. |
+| Payment and Coupon | Module 7 — Payment + Coupon | 🟢 Live — advance-payment flow for restricted customers reuses these same endpoints (see Customer strikes section below) |
+| Reviews | Module 8 — Review + Notification | 🟢 Live except `POST /reviews/:reviewId/images` (see that endpoint's note) — edit window is now a real 48h cutoff, not unlimited |
+| Admin | Module 9 — Admin | 🟢 Live — `docs/ADMIN_CONTRACT.md` fully implemented, and its previously-excluded items (settlements, coupon/category CRUD, customer strikes) are now built too (see their own sections below) |
+| Salon owner analytics, promotions, slot-templates, customer strikes | New this session, no prior contract | 🟢 Live — see their own sections below |
 
 A companion Postman collection ("Salonjaa API") and environment ("Salonjaa - Local") exist, generated from an OpenAPI spec at `postman/specs/openapi.yaml` in the backend repo — but it was only ever generated for Modules 1-4 and hasn't been kept in sync since (by explicit choice, not an oversight). Don't treat it as covering everything marked 🟢 Live above.
 
@@ -197,5 +198,56 @@ Purpose: File a complaint (about a booking, payment, salon, staff member, refund
 
 Purpose: A minimal admin dashboard aggregate — not a BI tool, no charts/time-series/export. Authentication: ADMIN only. Query: `from`, `to` (both optional `YYYY-MM-DD`, default last 30 days). Success: `{ "totalBookings":0, "completedBookings":0, "cancelledBookings":0, "totalSalons":0, "verifiedSalons":0, "pendingSalons":0, "totalRevenue":0, "openComplaints":0, "pendingRefunds":0 }`. Errors: `400`, `401`, `403`, `500`. Frontend: simple stat-card grid, a date-range picker for the from/to fields. **Backend note:** `from`/`to` only affects `totalBookings`/`completedBookings`/`cancelledBookings`/`totalRevenue` (activity within that window). `totalSalons`/`verifiedSalons`/`pendingSalons`/`openComplaints`/`pendingRefunds` are always the current live count, regardless of the date range — these are queue depths ("how many right now"), not period activity.
 
+### GET/POST /admin/categories, PATCH/DELETE /admin/categories/:id — 🟢 Live
+
+Purpose: platform service-category CRUD (previously `db:seed`-only). Authentication: ADMIN only. Create body `{ "name": string, "slug"?: string, "icon"?: string }` (slug auto-generated from name if omitted). Update body: any of `name`/`slug`/`icon`/`status` (`ACTIVE|INACTIVE`). Delete soft-deletes. Errors: `400`, `401`, `403`, `404`, `409` (duplicate slug), `500`.
+
+### GET/POST /admin/coupons, PATCH/DELETE /admin/coupons/:id — 🟢 Live
+
+Purpose: platform coupon CRUD (previously `db:seed`-only, only `POST /payments/coupons/validate` existed). Authentication: ADMIN only. Create body `{ "couponCode", "type": "FIXED"|"PERCENTAGE", "value", "minimumAmount"?, "maxDiscount"?, "usageLimit"?, "startsAt"?, "expiresAt"? }` (`startsAt`/`expiresAt` ISO datetime). Update body: any of the above plus `active`. Delete soft-deletes. Errors: `400`, `401`, `403`, `404`, `409` (duplicate code), `500`.
+
+### GET/POST /admin/settlements, POST /admin/settlements/:id/mark-settled — 🟢 Live
+
+Purpose: manual settlement records (TRD: "manual MVP records" — no commission-rate rule exists anywhere, so this doesn't compute one; the admin enters amounts from their own accounting). Authentication: ADMIN only. Create body `{ "salonId", "branchId"?, "periodStart", "periodEnd" (ISO datetime), "grossAmount", "commissionAmount"?, "refundAmount"?, "adjustmentAmount"?, "bookingIds"?: string[] }` — `netAmount` is computed (`gross - commission - refund + adjustment`). List query `salonId?`/`status?`. Errors: `400`, `401`, `403`, `404`, `500`.
+
+### GET/POST/POST /admin/customers/:customerId/strikes, POST .../:strikeId/remove — 🟢 Live
+
+Purpose: view/manage a customer's strike history. Authentication: ADMIN only. `GET` returns `{ customerId, activeNoShowCount, advancePaymentRequired, strikes: [...] }`. `POST` adds a manual strike: `{ "type": "FAKE_BOOKING"|"NO_SHOW"|"ABUSIVE_CANCELLATION", "bookingId"?, "notes"? }` (`NO_SHOW` strikes are normally auto-recorded — see `POST /salon-bookings/:id/no-show` below — this lets an admin backfill or record the other two types, which have no automated trigger yet). `POST .../remove` (reason required) marks a strike removed (metadata only, never deleted) — this is the only way to lift the advance-payment requirement early, since it's otherwise permanent. Errors: `400`, `401`, `403`, `404`, `409` (already removed), `500`.
+
 ### Not built yet
-`docs/ADMIN_CONTRACT.md` (backend repo) is now fully implemented. Explicitly out of scope until a new contract exists: settlement creation, coupon/category management, customer strikes.
+`docs/ADMIN_CONTRACT.md` (backend repo) is now fully implemented, and its explicitly-excluded items above (settlement creation, coupon/category management, customer strikes) are now also built, per a new contract co-defined directly with the developer this session. Nothing currently outstanding on the Admin surface.
+
+## Customer strikes / advance payment / NO_SHOW — 🟢 Live (new, this session)
+
+**Policy** (finalized, not provisional): a customer's 4th lifetime `NO_SHOW` accumulates permanently — every `PAY_AT_SALON` booking after that requires a 10%-of-total advance deposit before the salon can approve it. Choosing `ONLINE` payment instead needs no separate advance (paying the full amount upfront already covers it). The restriction never lifts automatically — only an admin removing a strike (see above) can lower it back under the threshold.
+
+- `POST /bookings` gains no new required field, but its response's booking now carries `requiresAdvancePayment`/`advanceAmount` (both visible via `GET /bookings/:id`) — check these after creating a `PAY_AT_SALON` booking to know whether a payment step is needed before the salon will even review it.
+- The advance is paid through the **existing** `POST /payments/create-order`/`POST /payments/verify` endpoints — no new payment endpoints. If `requiresAdvancePayment` is true and unpaid, `create-order` returns an order for just the advance amount (not the full booking total); once `verify` succeeds, `POST /salon-bookings/:id/approve` becomes callable (409 until then). This is on top of / independent from the normal `AWAITING_PAYMENT` full-payment flow for `ONLINE` bookings — a `PAY_AT_SALON` booking never enters `AWAITING_PAYMENT`.
+- `POST /salon-bookings/:id/no-show` (owning Salon Owner, `{}` body) — marks an `APPROVED` booking `NO_SHOW` any time at/after its scheduled start. Records the strike automatically. Errors: `400` (too early), `401`, `403`, `404`, `409` (not `APPROVED`), `500`.
+- Cancelling (`POST /bookings/:id/cancel`) a booking whose advance was paid forfeits it — no refund-request is possible on it (`POST /payments/refund-request` will `409`) — but a `FIXED` coupon for that exact amount is auto-issued to the customer, redeemable via the existing `couponCode` field on `POST /bookings` (personalized — only that customer can use it). Frontend: surface the issued coupon somewhere the customer will see it (a notification event `ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED` fires, carrying the code and amount, but there's no "my coupons" list endpoint — same precedent as coupons generally having no discovery endpoint besides validate-by-code).
+
+## Cancellation, refund & review-edit policy — finalized this session (previously provisional/no-cutoff)
+
+- `POST /bookings/:id/cancel`: free up to **2 hours** before `scheduledStart`; blocked entirely inside that window (`409`, no exceptions/strikes for a late attempt).
+- `PATCH /reviews/:reviewId`: only within **48 hours** of the review's `createdAt`; `422` past that.
+- OTP: unchanged numerically except `OTP_EXPIRY_SECONDS` 300→600 (10 minutes) — attempts/cooldown/rate-limit were already implemented as documented in the TRD, just never called out here.
+
+## Booking response gaps closed — 🟢 Live (new, this session)
+
+- `GET /users/me/bookings` — now live (was `⚪ Not built`). Query `status=COMPLETED|CANCELLED|UPCOMING` (`UPCOMING` = `PENDING`/`AWAITING_PAYMENT`/`APPROVED`). Default envelope, array of the same booking DTO `GET /bookings/my-bookings` returns — this is effectively an alias over the same data under the documented `/users/me` path.
+- Customer can now respond to a salon-proposed reschedule: **the existing** `POST /bookings/:id/approve-reschedule`/`POST /bookings/:id/reject-reschedule` endpoints now work for **either** direction — whoever did *not* propose the pending reschedule request is the one who must call them (a customer proposal still needs the owning Salon Owner to respond, unchanged; a salon proposal now needs the booking's own customer). No new route names were introduced. Calling it as the wrong party (e.g. an owner trying to approve their own proposal) returns `404`, same "don't leak existence" pattern as everywhere else.
+
+## Salon media gallery, promotions, slot templates, owner analytics — 🟢 Live (new, this session, no contract previously existed)
+
+### GET/POST /salons/:salonId/gallery, DELETE .../gallery/:imageId — 🟢 Live
+Purpose: multi-image gallery per salon. Authentication (write): owning Salon Owner. Add body `{ "imageUrl": string (URL), "displayOrder"?: number }` — same "URL string, frontend hosts the file elsewhere" pattern as `salons.logo`/`coverImage`, no upload endpoint. `GET /public/branches/:branchId`'s `gallery` field (previously always `[]`) is now populated from this.
+
+### GET/POST /branches/:id/slot-templates, PATCH/DELETE .../slot-templates/:templateId — 🟢 Live
+Purpose: owner-defined time-slot templates, replacing the fixed 30-minute interval `GET /availability/slots` used everywhere before. Authentication: owning Salon Owner. Body `{ "name", "startTime"/"endTime" (HH:MM), "slotDurationMinutes" }`. A branch with zero active templates keeps the old fixed-interval behavior unchanged (fully backward compatible) — only branches that add one or more templates see per-template slot generation.
+
+### GET/POST /promotions, PATCH/DELETE /promotions/:id (owner) — 🟢 Live
+### GET /public/promotions?branchId= (public, no auth) — 🟢 Live
+Purpose: marketing promotions (title/description/banner/date range), targeting one or more of the owner's own branches/services. **Not related to coupons** — no coupon-code linkage, purely display content; `POST /payments/coupons/validate` remains the only coupon path. Create body `{ "title", "description"?, "bannerImageUrl"?, "startsAt"/"endsAt" (ISO datetime), "branchIds": string[], "serviceIds"?: string[] }`. Auto-deactivates at `endsAt`. Public discovery returns only currently-active, in-range promotions.
+
+### GET /salons/:salonId/analytics?from&to — 🟢 Live
+Purpose: owner-facing analytics for one salon (beyond Admin's platform-wide reports overview). Authentication: owning Salon Owner. Query `from`/`to` (`YYYY-MM-DD`, optional, default last 30 days). Success: `{ totalBookings, completedBookings, cancelledBookings, noShowBookings, totalRevenue, averageRating, reviewCount, topServices: [{serviceId, serviceName, bookingCount}] }` — `averageRating`/`reviewCount` are live (not date-ranged), everything else is scoped to `from`/`to`.
