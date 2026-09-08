@@ -15,6 +15,7 @@ export class PublicBranchService {
       city: query.city,
       q: query.q,
       serviceCategoryId: query.serviceCategoryId,
+      salonId: query.salonId,
     });
     const ratings = await this.repo.getRatingAggregates(rows.map((r) => r.branch.id));
 
@@ -83,6 +84,7 @@ export class PublicBranchService {
       addressLine1: branch.addressLine1,
       latitude: branch.latitude,
       longitude: branch.longitude,
+      phone: branch.phone,
       verificationStatus: salon.verificationStatus,
       averageRating: rating?.average ?? null,
       reviewCount: rating?.count ?? 0,

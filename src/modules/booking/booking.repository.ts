@@ -97,7 +97,7 @@ export class BookingRepository {
         : Promise.resolve([]),
       branchIds.length
         ? db
-            .select({ id: branches.id, name: branches.name, city: branches.city })
+            .select({ id: branches.id, name: branches.name, city: branches.city, phone: branches.phone })
             .from(branches)
             .where(inArray(branches.id, branchIds))
         : Promise.resolve([]),
@@ -107,7 +107,7 @@ export class BookingRepository {
     ]);
 
     const salonMap = new Map(salonRows.map((s) => [s.id, s.name]));
-    const branchMap = new Map(branchRows.map((b) => [b.id, { name: b.name, city: b.city }]));
+    const branchMap = new Map(branchRows.map((b) => [b.id, { name: b.name, city: b.city, phone: b.phone }]));
     const staffMap = new Map(staffRows.map((s) => [s.id, s.fullName]));
 
     const result = new Map<string, BookingNames>();
@@ -118,6 +118,7 @@ export class BookingRepository {
         branchName: branch?.name ?? null,
         city: branch?.city ?? null,
         staffName: r.selectedStaffId ? staffMap.get(r.selectedStaffId) ?? null : null,
+        branchPhone: branch?.phone ?? null,
       });
     }
     return result;

@@ -10,6 +10,7 @@ import {
   BookingDTO,
   BookingNames,
   BookingServiceLine,
+  CancelBookingInput,
   CreateBookingInput,
   ProposeRescheduleInput,
   RescheduleRequestDTO,
@@ -169,7 +170,8 @@ export class BookingService {
    * If this booking had a paid advance deposit (Module 16 strikes policy), that deposit is
    * forfeited rather than refunded — see issueForfeitureCoupon.
    */
-  async cancel(userId: string, bookingId: string, reason?: string): Promise<BookingDTO> {
+  async cancel(userId: string, bookingId: string, input: CancelBookingInput): Promise<BookingDTO> {
+    const { reasonCode, reason } = input;
     const booking = await this.repo.findById(bookingId);
     if (!booking || booking.customerId !== userId) {
       throw new NotFoundError("Booking not found");
@@ -185,7 +187,7 @@ export class BookingService {
       bookingId,
       booking.bookingStatus,
       "CANCELLED",
-      { cancelledAt: new Date(), cancellationReason: reason ?? null },
+      { cancelledAt: new Date(), cancellationReason: reason ?? null, cancellationReasonCode: reasonCode ?? null },
       userId,
       reason
     );
@@ -829,6 +831,7 @@ export class BookingService {
       notes: booking.notes,
       rejectionReason: booking.rejectionReason,
       cancellationReason: booking.cancellationReason,
+      cancellationReasonCode: booking.cancellationReasonCode,
       approvedAt: booking.approvedAt?.toISOString() ?? null,
       completedAt: booking.completedAt?.toISOString() ?? null,
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,
@@ -849,6 +852,7 @@ export class BookingService {
       branchName: names?.branchName ?? null,
       city: names?.city ?? null,
       staffName: names?.staffName ?? null,
+      branchPhone: names?.branchPhone ?? null,
     };
   }
 

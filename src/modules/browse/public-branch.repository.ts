@@ -6,6 +6,9 @@ export interface BranchSearchFilters {
   city?: string;
   q?: string;
   serviceCategoryId?: string;
+  // Closes docs/COMPETITOR_COMPARISON_LUZO.md's "View Branches" gap — lets the salon detail
+  // page list a brand's other locations without a separate endpoint.
+  salonId?: string;
 }
 
 export class PublicBranchRepository {
@@ -22,6 +25,9 @@ export class PublicBranchRepository {
       eq(salons.status, "ACTIVE"),
       eq(salons.verificationStatus, "VERIFIED"),
     ];
+    if (filters.salonId) {
+      conditions.push(eq(branches.salonId, filters.salonId));
+    }
     if (filters.city) {
       conditions.push(ilike(branches.city, filters.city));
     }

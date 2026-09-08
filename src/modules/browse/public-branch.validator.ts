@@ -5,6 +5,7 @@ export const branchSearchQuerySchema = z
     city: z.string().trim().min(1).optional(),
     q: z.string().trim().min(1).optional(),
     serviceCategoryId: z.string().uuid("Invalid serviceCategoryId").optional(),
+    salonId: z.string().uuid("Invalid salonId").optional(),
     lat: z.coerce.number().min(-90).max(90).optional(),
     lng: z.coerce.number().min(-180).max(180).optional(),
     sort: z.enum(["distance", "rating", "popular"]).optional(),

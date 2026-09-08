@@ -23,7 +23,7 @@ export class BookingController {
   }
 
   async cancel(req: Request, res: Response): Promise<void> {
-    const booking = await bookingService.cancel(req.user!.id, req.params.id, req.body?.reason);
+    const booking = await bookingService.cancel(req.user!.id, req.params.id, req.body ?? {});
     res.status(200).json({ success: true, data: booking });
   }
 

@@ -28,6 +28,7 @@ export async function createBookableBranch(
     .values({
       salonId: salon.id,
       name: "Test Branch",
+      phone: "+919999999999",
       addressLine1: "1 Test Street",
       city: "Hyderabad",
       state: "Telangana",

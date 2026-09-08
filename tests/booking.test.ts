@@ -31,6 +31,11 @@ describe("Booking — create/approve/reject", () => {
     expect(res.status).toBe(201);
     expect(res.body.status).toBe("PENDING");
     expect(res.body.bookingId).toBeTruthy();
+
+    // COMPETITOR_COMPARISON_LUZO.md's "Call Salon" gap — branch phone now resolves onto the
+    // customer-facing booking detail.
+    const detail = await request(app).get(`/api/v1/bookings/${res.body.bookingId}`).set(authHeader(customer.accessToken));
+    expect(detail.body.booking.branchPhone).toBe("+919999999999");
   });
 
   it("rejects a booking with an invalid serviceId (400)", async () => {
@@ -118,6 +123,32 @@ describe("Booking — cancellation policy (Module 16: free until 2h before, then
     const res = await request(app).post(`/api/v1/bookings/${createRes.body.bookingId}/cancel`).set(authHeader(customer.accessToken)).send({});
     expect(res.status).toBe(200);
     expect(res.body.data.bookingStatus).toBe("CANCELLED");
+  });
+
+  it("accepts a structured cancellation reasonCode alongside freeform reason (COMPETITOR_COMPARISON_LUZO.md)", async () => {
+    const fixture = await createBookableBranch();
+    const customer = await createTestUser([ROLE_NAMES.CUSTOMER]);
+    const createRes = await request(app).post("/api/v1/bookings").set(authHeader(customer.accessToken)).send(bookingBody(fixture));
+
+    const res = await request(app)
+      .post(`/api/v1/bookings/${createRes.body.bookingId}/cancel`)
+      .set(authHeader(customer.accessToken))
+      .send({ reasonCode: "BOOKED_BY_MISTAKE", reason: "Selected the wrong branch" });
+    expect(res.status).toBe(200);
+    expect(res.body.data.cancellationReasonCode).toBe("BOOKED_BY_MISTAKE");
+    expect(res.body.data.cancellationReason).toBe("Selected the wrong branch");
+  });
+
+  it("rejects an invalid reasonCode (400)", async () => {
+    const fixture = await createBookableBranch();
+    const customer = await createTestUser([ROLE_NAMES.CUSTOMER]);
+    const createRes = await request(app).post("/api/v1/bookings").set(authHeader(customer.accessToken)).send(bookingBody(fixture));
+
+    const res = await request(app)
+      .post(`/api/v1/bookings/${createRes.body.bookingId}/cancel`)
+      .set(authHeader(customer.accessToken))
+      .send({ reasonCode: "NOT_A_REAL_REASON" });
+    expect(res.status).toBe(400);
   });
 
   it("blocks cancellation inside the 2h cutoff", async () => {

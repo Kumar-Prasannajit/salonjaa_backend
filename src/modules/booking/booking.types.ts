@@ -17,6 +17,7 @@ export interface CreateBookingInput {
 }
 
 export interface CancelBookingInput {
+  reasonCode?: "NEED_HELP" | "TOOK_TOO_LONG_TO_CONFIRM" | "BOOKED_BY_MISTAKE" | "BOOKED_ELSEWHERE" | "OTHER";
   reason?: string;
 }
 
@@ -84,6 +85,7 @@ export interface BookingDTO {
   notes: string | null;
   rejectionReason: string | null;
   cancellationReason: string | null;
+  cancellationReasonCode: string | null;
   approvedAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
@@ -100,6 +102,8 @@ export interface BookingDTO {
   branchName: string | null;
   city: string | null;
   staffName: string | null;
+  // Closes docs/COMPETITOR_COMPARISON_LUZO.md's "Call Salon" gap.
+  branchPhone: string | null;
 }
 
 /** Denormalized names resolved for one booking, keyed by bookingId when resolving in bulk. */
@@ -108,6 +112,7 @@ export interface BookingNames {
   branchName: string | null;
   city: string | null;
   staffName: string | null;
+  branchPhone: string | null;
 }
 
 export interface RescheduleRequestDTO {

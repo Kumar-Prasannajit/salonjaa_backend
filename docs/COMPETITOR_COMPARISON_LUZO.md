@@ -75,11 +75,13 @@ This is the part of LUZO's model most worth sitting with. Their sidebar has **tw
 
 ## Recommendations, roughly by effort
 
-**Cheap, no new schema, worth doing soon:**
-- Add `salonId` as a `GET /public/branches` filter — closes the "View Branches" gap.
-- Add branch `phone` to the customer-facing booking DTO — closes "Call Salon."
-- Turn `cancel`'s freeform `reason` into a fixed enum (+ "Other" freeform) — real analytics value, small change.
-- Revisit `BOOKING_DEFAULT_EXPIRY_HOURS` — this is the one that most changes the customer's actual experience of the app. **Needs your call**, not mine: is 12h intentional slack for salons, or should it come down toward something like LUZO's 15 minutes (with a real operational cost to salons if they can't realistically respond that fast)?
+**Cheap, no new schema, worth doing soon — all four ✅ done (2026-09-09):**
+- ~~Add `salonId` as a `GET /public/branches` filter~~ — done, closes the "View Branches" gap. Also added `phone` to `GET /public/branches/:branchId` (closes "Contact").
+- ~~Add branch `phone` to the customer-facing booking DTO~~ — done, `GET /bookings/:id`'s `booking.branchPhone`. Closes "Call Salon."
+- ~~Turn `cancel`'s freeform `reason` into a fixed enum~~ — done. New optional `reasonCode` (`NEED_HELP`/`TOOK_TOO_LONG_TO_CONFIRM`/`BOOKED_BY_MISTAKE`/`BOOKED_ELSEWHERE`/`OTHER`) alongside the unchanged freeform `reason`, migration `0013_broad_xavin.sql`. Not yet required — frontend has no picker UI for it yet, that's tomorrow's work (see the handoff prompt).
+- ~~Revisit `BOOKING_DEFAULT_EXPIRY_HOURS`~~ — done, matched exactly to LUZO's 15 minutes, renamed to `BOOKING_DEFAULT_EXPIRY_MINUTES=15`.
+
+All four verified via real tests (`tests/browse.test.ts`, `tests/booking.test.ts`) against the live dev DB, not just typecheck.
 
 **Real feature work, needs a product decision first (same discipline as every other module this project has followed — don't build a contract, define it with you first):**
 - Service variants/customisation (schema-level: a `service_variants` table, or repurpose `branch_services` with a parent/child relationship).

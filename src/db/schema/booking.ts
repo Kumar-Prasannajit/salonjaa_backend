@@ -5,6 +5,7 @@ import {
   requestedByEnum,
   rescheduleRequestStatusEnum,
   paymentMethodEnum,
+  bookingCancellationReasonEnum,
 } from "@/db/schema/enums";
 import { branches } from "@/db/schema/branch";
 import { staff } from "@/db/schema/staff";
@@ -51,6 +52,9 @@ export const bookings = pgTable(
     notes: text("notes"),
     rejectionReason: text("rejection_reason"),
     cancellationReason: text("cancellation_reason"),
+    // Closes docs/COMPETITOR_COMPARISON_LUZO.md's structured-cancellation-reason gap —
+    // cancellationReason above stays as freeform detail (used most when this is OTHER/null).
+    cancellationReasonCode: bookingCancellationReasonEnum("cancellation_reason_code"),
     rescheduleReason: text("reschedule_reason"),
     // Module 16 — customer-strikes/advance-payment policy. Set at creation time when the
     // customer already has 4+ lifetime NO_SHOW strikes (see src/modules/strike). Amount is a

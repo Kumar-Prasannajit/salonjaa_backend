@@ -2,6 +2,9 @@ export interface BranchSearchQuery {
   city?: string;
   q?: string;
   serviceCategoryId?: string;
+  // Closes docs/COMPETITOR_COMPARISON_LUZO.md's "View Branches" gap — "show this brand's
+  // other locations" from the salon detail page.
+  salonId?: string;
   lat?: number;
   lng?: number;
   sort?: "distance" | "rating" | "popular";
@@ -49,6 +52,8 @@ export interface PublicBranchDetailDTO {
   addressLine1: string;
   latitude: number | null;
   longitude: number | null;
+  // Closes docs/COMPETITOR_COMPARISON_LUZO.md's "Contact"/"Call Salon" gap.
+  phone: string | null;
   verificationStatus: string;
   averageRating: number | null;
   reviewCount: number;

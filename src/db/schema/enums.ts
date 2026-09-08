@@ -34,6 +34,16 @@ export const bookingStatusEnum = pgEnum("booking_status", [
 ]);
 export const rescheduleRequestStatusEnum = pgEnum("reschedule_request_status", ["PENDING", "ACCEPTED", "REJECTED"]);
 export const requestedByEnum = pgEnum("requested_by", ["CUSTOMER", "SALON"]);
+// Closes docs/COMPETITOR_COMPARISON_LUZO.md's "cancellation reason is freeform text, no
+// analytics" gap — a structured code alongside the existing freeform `cancellationReason`
+// (kept for "OTHER"/extra detail), same pattern as LUZO's fixed reason list.
+export const bookingCancellationReasonEnum = pgEnum("booking_cancellation_reason", [
+  "NEED_HELP",
+  "TOOK_TOO_LONG_TO_CONFIRM",
+  "BOOKED_BY_MISTAKE",
+  "BOOKED_ELSEWHERE",
+  "OTHER",
+]);
 export const strikeTypeEnum = pgEnum("strike_type", ["FAKE_BOOKING", "NO_SHOW", "ABUSIVE_CANCELLATION"]);
 
 // Payment / coupon / settlement

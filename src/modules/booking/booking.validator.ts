@@ -27,7 +27,11 @@ export const bookingIdParamSchema = z.object({
   id: z.string().uuid("Invalid booking id"),
 });
 
+// Closes docs/COMPETITOR_COMPARISON_LUZO.md's structured-cancellation-reason gap. reasonCode
+// is optional (not yet required — frontend doesn't have the picker UI built yet) so existing
+// freeform-only callers keep working unchanged; once the UI ships this can become required.
 export const cancelBookingSchema = z.object({
+  reasonCode: z.enum(["NEED_HELP", "TOOK_TOO_LONG_TO_CONFIRM", "BOOKED_BY_MISTAKE", "BOOKED_ELSEWHERE", "OTHER"]).optional(),
   reason: z.string().trim().max(500).optional(),
 });
 
