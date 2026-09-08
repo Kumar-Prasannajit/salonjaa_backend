@@ -105,7 +105,7 @@ export class BookingService {
       advanceAmount,
     });
 
-    await scheduleBookingExpiry(booking.id, env.BOOKING_DEFAULT_EXPIRY_HOURS * 60 * 60 * 1000);
+    await scheduleBookingExpiry(booking.id, env.BOOKING_DEFAULT_EXPIRY_MINUTES * 60 * 1000);
     await this.notificationService.notify({
       userId,
       eventType: "BOOKING_CREATED",

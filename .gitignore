@@ -21,3 +21,7 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
+
+# Temporary competitor-research scrape — never commit (per explicit instruction). The durable
+# output lives in docs/COMPETITOR_COMPARISON_LUZO.md instead.
+luzo.txt

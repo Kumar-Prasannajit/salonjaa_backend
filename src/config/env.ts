@@ -47,12 +47,17 @@ const envSchema = z.object({
     .preprocess((value) => value === true || value === "true", z.boolean())
     .default(false),
 
-  BOOKING_DEFAULT_EXPIRY_HOURS: z.coerce.number().int().positive().default(12),
+  // Renamed from BOOKING_DEFAULT_EXPIRY_HOURS (was 12h) per docs/COMPETITOR_COMPARISON_LUZO.md's
+  // finding: 12 hours is a very different customer promise than a competitor's 15-minute
+  // salon-confirmation SLA. Decided with the user to match it exactly — hours couldn't express
+  // 15 minutes precisely, so the var moved to minutes, same naming precedent as
+  // BOOKING_PAYMENT_WINDOW_MINUTES/PAYMENT_ORDER_EXPIRY_MINUTES.
+  BOOKING_DEFAULT_EXPIRY_MINUTES: z.coerce.number().int().positive().default(15),
 
   // Module 13 — a payment left PENDING forever (Razorpay widget closed without completing,
   // no webhook to tell us) permanently blocked create-order's "only a FAILED payment can be
   // retried" rule. This is a provisional numeric policy, same category as
-  // BOOKING_DEFAULT_EXPIRY_HOURS — the client hasn't specified an exact timeout, chosen to be
+  // BOOKING_DEFAULT_EXPIRY_MINUTES — the client hasn't specified an exact timeout, chosen to be
   // generous enough for a real checkout attempt. Revisit if given a real number.
   PAYMENT_ORDER_EXPIRY_MINUTES: z.coerce.number().int().positive().default(20),
 
