@@ -23,6 +23,11 @@ export const MAX_PAGE_SIZE = 100;
 // are generated at this fixed interval across the branch's opening->closing window instead.
 export const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
 
+// Module 16 — finalized review edit window (was "editable forever, no cutoff" — see
+// docs/context.md's old Pending Decisions entry, now resolved): a review integrity measure,
+// not a technical requirement — see ReviewService.update's doc comment.
+export const REVIEW_EDIT_WINDOW_HOURS = 48;
+
 // Module 16 — finalized cancellation/refund cutoff (was provisional/no-cutoff — see
 // docs/context.md's old Pending Decisions entry, now resolved): free cancellation up to this
 // many hours before scheduledStart; blocked entirely inside the window, no exceptions.

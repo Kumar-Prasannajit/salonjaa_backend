@@ -2,8 +2,9 @@ import { ReviewRepository, ReviewCategory } from "@/modules/review/review.reposi
 import { BookingRepository } from "@/modules/booking/booking.repository";
 import { SalonService } from "@/modules/salon/salon.service";
 import { CreateReviewInput, ReviewDTO, UpdateReviewInput } from "@/modules/review/review.types";
-import { ConflictError, NotFoundError } from "@/shared/errors";
+import { ConflictError, NotFoundError, UnprocessableEntityError } from "@/shared/errors";
 import { reviews, reviewCategoryRatings, reviewResponses } from "@/db/schema";
+import { REVIEW_EDIT_WINDOW_HOURS } from "@/shared/constants";
 
 type ReviewRow = typeof reviews.$inferSelect;
 type CategoryRatingRow = typeof reviewCategoryRatings.$inferSelect;
@@ -51,14 +52,20 @@ export class ReviewService {
   }
 
   /**
-   * PROVISIONAL: no edit-period cutoff enforced — the numeric review edit period is
-   * unresolved (context.md Pending Decisions), same category and same placeholder treatment
-   * already applied to booking cancellation and refund eligibility.
+   * Module 16 — finalized edit window (was an unconditional "editable forever" placeholder):
+   * REVIEW_EDIT_WINDOW_HOURS (48) after posting, then locked. Decided with the user as a
+   * review-integrity measure (an editable-forever review can be pressured/retaliated on long
+   * after the fact) rather than a technical requirement — see docs/PROGRESS.md's Module 16
+   * entry for the reasoning.
    */
   async update(userId: string, reviewId: string, input: UpdateReviewInput): Promise<ReviewDTO> {
     const review = await this.repo.findById(reviewId);
     if (!review || review.customerId !== userId) {
       throw new NotFoundError("Review not found");
+    }
+    const hoursSincePosted = (Date.now() - review.createdAt.getTime()) / 3_600_000;
+    if (hoursSincePosted > REVIEW_EDIT_WINDOW_HOURS) {
+      throw new UnprocessableEntityError(`Reviews can only be edited within ${REVIEW_EDIT_WINDOW_HOURS} hours of posting`);
     }
 
     const updated = await this.repo.update(reviewId, {
