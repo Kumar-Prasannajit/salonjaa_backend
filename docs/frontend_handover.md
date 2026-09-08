@@ -251,3 +251,7 @@ Purpose: marketing promotions (title/description/banner/date range), targeting o
 
 ### GET /salons/:salonId/analytics?from&to — 🟢 Live
 Purpose: owner-facing analytics for one salon (beyond Admin's platform-wide reports overview). Authentication: owning Salon Owner. Query `from`/`to` (`YYYY-MM-DD`, optional, default last 30 days). Success: `{ totalBookings, completedBookings, cancelledBookings, noShowBookings, totalRevenue, averageRating, reviewCount, topServices: [{serviceId, serviceName, bookingCount}] }` — `averageRating`/`reviewCount` are live (not date-ranged), everything else is scoped to `from`/`to`.
+
+## ⚪ Not built yet — pending a decision, don't build frontend against these
+
+`docs/NEXT_SESSION_PLAN.md` (backend repo) lists 5 items identified from a competitor comparison: service variants/customisation, price-tier + gender-served tags on listing cards, offer banners on listing cards, a general customer wallet, and a "pay for a walk-in with no prior booking" flow. **None of these have a contract yet** — each has open product/schema questions that need answering with the client before any endpoint exists. Don't start frontend work against guessed shapes for these; check back once `docs/NEXT_SESSION_PLAN.md`'s items move to their own `🟢 Live` sections above.
