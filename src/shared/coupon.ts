@@ -11,6 +11,9 @@ export interface CouponLike {
   usedCount: number;
   startsAt: Date | null;
   expiresAt: Date | null;
+  // Module 16 — set only on a forfeited-advance-payment coupon (see
+  // BookingService.issueForfeitureCoupon). null for every ordinary platform-wide coupon.
+  restrictedToCustomerId?: string | null;
 }
 
 /**
@@ -20,8 +23,14 @@ export interface CouponLike {
  * discount." Throws UnprocessableEntityError (422) on any ineligibility, matching Module 7's
  * original behavior exactly.
  */
-export function assertCouponEligible(coupon: CouponLike, bookingAmount: number): void {
+export function assertCouponEligible(coupon: CouponLike, bookingAmount: number, customerId?: string): void {
   const now = new Date();
+  if (coupon.restrictedToCustomerId && coupon.restrictedToCustomerId !== customerId) {
+    // Same NotFound-flavored non-leak as the rest of this codebase's ownership checks, but
+    // coupon validation only ever throws 422 (see below) — "not found or inactive" reads
+    // correctly here too without revealing the coupon is real but belongs to someone else.
+    throw new UnprocessableEntityError("Coupon not found or inactive");
+  }
   if (coupon.startsAt && coupon.startsAt > now) {
     throw new UnprocessableEntityError("Coupon is not active yet");
   }

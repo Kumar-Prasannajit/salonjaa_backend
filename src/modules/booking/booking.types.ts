@@ -88,6 +88,9 @@ export interface BookingDTO {
   completedAt: string | null;
   cancelledAt: string | null;
   expiredAt: string | null;
+  noShowAt: string | null;
+  requiresAdvancePayment: boolean;
+  advanceAmount: number | null;
   createdAt: string;
   services?: BookingServiceLine[];
   // Resolved server-side at query time — see docs/PROGRESS.md's "booking responses have no

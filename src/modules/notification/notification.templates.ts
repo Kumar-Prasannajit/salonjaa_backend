@@ -57,6 +57,14 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
     subject: "The salon proposed a new time for your Salonjaa booking",
     body: `The salon proposed a new time for booking ${d.bookingNumber}. Review it in the app.`,
   }),
+  BOOKING_RESCHEDULE_ACCEPTED_BY_CUSTOMER: (d) => ({
+    subject: "Your proposed reschedule was accepted",
+    body: `The customer accepted your proposed new time for booking ${d.bookingNumber}.`,
+  }),
+  BOOKING_RESCHEDULE_DECLINED_BY_CUSTOMER: (d) => ({
+    subject: "Your proposed reschedule was declined",
+    body: `The customer declined your proposed new time for booking ${d.bookingNumber}.`,
+  }),
   REFUND_REQUESTED: (d) => ({
     subject: "Your Salonjaa refund request was received",
     body: `Your refund request for booking ${d.bookingNumber} (amount ${d.amount}) has been received and is pending review.`,
@@ -92,6 +100,18 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
   COMPLAINT_REJECTED: (d) => ({
     subject: "Your Salonjaa complaint was reviewed",
     body: `Your complaint was reviewed and rejected. Reason: ${d.reason ?? "Not specified"}.`,
+  }),
+  BOOKING_NO_SHOW: (d) => ({
+    subject: "You were marked a no-show for a Salonjaa booking",
+    body: `You were marked as a no-show for booking ${d.bookingNumber}. Repeated no-shows require an advance payment on future bookings.`,
+  }),
+  ADVANCE_PAYMENT_RECEIVED: (d) => ({
+    subject: "Your Salonjaa advance payment was received",
+    body: `Your advance payment of ${d.amount} for booking ${d.bookingNumber} was received. The salon will review your booking shortly.`,
+  }),
+  ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED: (d) => ({
+    subject: "Your advance payment was converted to a coupon",
+    body: `Your advance payment for booking ${d.bookingNumber} is non-refundable, so we've converted it into a coupon (code ${d.couponCode}, worth ${d.amount}) you can use on a future booking.`,
   }),
 };
 

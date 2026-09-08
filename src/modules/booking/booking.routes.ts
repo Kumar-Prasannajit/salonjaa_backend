@@ -54,16 +54,17 @@ router.post(
   asyncHandler((req, res) => controller.requestReschedule(req, res))
 );
 
+// Responder (owning Salon Owner or the booking's own customer) is resolved in the service
+// based on who proposed the pending request, not by role here — see
+// BookingService.assertRescheduleResponder's doc comment (Module 15).
 router.post(
   "/:id/approve-reschedule",
-  requireRole(ROLE_NAMES.SALON_OWNER),
   validate({ params: bookingIdParamSchema }),
   asyncHandler((req, res) => controller.approveReschedule(req, res))
 );
 
 router.post(
   "/:id/reject-reschedule",
-  requireRole(ROLE_NAMES.SALON_OWNER),
   validate({ params: bookingIdParamSchema, body: rejectRescheduleSchema }),
   asyncHandler((req, res) => controller.rejectReschedule(req, res))
 );

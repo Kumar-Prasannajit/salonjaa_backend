@@ -27,3 +27,10 @@ export function generateBookingNumber(): string {
   const randomPart = crypto.randomBytes(3).toString("hex").toUpperCase();
   return `SLJ-${timePart}-${randomPart}`;
 }
+
+/** Module 16 — code for a forfeited-advance-payment coupon, e.g. "ADV-K3J9X2Q7". Same
+ * "random suffix, negligible collision odds" reasoning as generateBookingNumber. */
+export function generateCouponCode(prefix = "ADV"): string {
+  const randomPart = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return `${prefix}-${randomPart}`;
+}

@@ -6,6 +6,8 @@ interface CreatePaymentParams {
   bookingId: string;
   customerId: string | null;
   method: "ONLINE" | "PAY_AT_SALON";
+  // Module 16 — defaults to FULL (every payment before this module was implicitly FULL).
+  purpose?: "FULL" | "ADVANCE";
   provider: "RAZORPAY" | "CASHFREE" | "NONE";
   providerOrderId: string | null;
   amount: number;
@@ -56,20 +58,24 @@ export class PaymentRepository {
   }
 
   /** A PENDING or SUCCESS payment already reserves this booking — used to block duplicate order creation. */
-  async findActivePaymentForBooking(bookingId: string) {
+  async findActivePaymentForBooking(bookingId: string, purpose: "FULL" | "ADVANCE" = "FULL") {
     const [row] = await db
       .select()
       .from(payments)
-      .where(and(eq(payments.bookingId, bookingId), inArray(payments.status, ["PENDING", "SUCCESS"])))
+      .where(
+        and(eq(payments.bookingId, bookingId), eq(payments.purpose, purpose), inArray(payments.status, ["PENDING", "SUCCESS"]))
+      )
       .limit(1);
     return row ?? null;
   }
 
-  async findSuccessfulPaymentForBooking(bookingId: string) {
+  /** Module 16 — defaults to FULL so refund-request never picks up a non-refundable ADVANCE
+   * payment (see BookingService.cancel's forfeiture-coupon path instead). */
+  async findSuccessfulPaymentForBooking(bookingId: string, purpose: "FULL" | "ADVANCE" = "FULL") {
     const [row] = await db
       .select()
       .from(payments)
-      .where(and(eq(payments.bookingId, bookingId), eq(payments.status, "SUCCESS")))
+      .where(and(eq(payments.bookingId, bookingId), eq(payments.purpose, purpose), eq(payments.status, "SUCCESS")))
       .limit(1);
     return row ?? null;
   }

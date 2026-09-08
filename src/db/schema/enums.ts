@@ -38,6 +38,9 @@ export const strikeTypeEnum = pgEnum("strike_type", ["FAKE_BOOKING", "NO_SHOW", 
 
 // Payment / coupon / settlement
 export const paymentMethodEnum = pgEnum("payment_method", ["ONLINE", "PAY_AT_SALON"]);
+// Module 16 — distinguishes a strikes-policy advance payment (10% of a restricted customer's
+// booking, paid before the salon owner can approve it) from the normal full-amount payment.
+export const paymentPurposeEnum = pgEnum("payment_purpose", ["FULL", "ADVANCE"]);
 export const paymentProviderEnum = pgEnum("payment_provider", ["NONE", "RAZORPAY", "CASHFREE"]);
 export const paymentStatusEnum = pgEnum("payment_status", [
   "PENDING",

@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import {
   paymentMethodEnum,
   paymentProviderEnum,
+  paymentPurposeEnum,
   paymentStatusEnum,
   refundStatusEnum,
   couponTypeEnum,
@@ -35,6 +36,9 @@ export const payments = pgTable(
       .references(() => bookings.id, { onDelete: "restrict" }),
     customerId: uuid("customer_id").references(() => users.id, { onDelete: "set null" }),
     method: paymentMethodEnum("method").notNull().default("ONLINE"),
+    // Module 16 — ADVANCE for the strikes-policy pre-payment, FULL for everything else
+    // (every payment before this module was implicitly FULL).
+    purpose: paymentPurposeEnum("purpose").notNull().default("FULL"),
     provider: paymentProviderEnum("provider").notNull().default("RAZORPAY"),
     providerOrderId: varchar("provider_order_id", { length: 100 }),
     providerPaymentId: varchar("provider_payment_id", { length: 100 }),
@@ -128,6 +132,10 @@ export const coupons = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    // Module 16 — set only for a strikes-policy forfeiture coupon (see src/modules/strike):
+    // when non-null, only this customer may redeem it (assertCouponEligible enforces this).
+    // Null for every ordinary platform-wide coupon, unchanged from before this module.
+    restrictedToCustomerId: uuid("restricted_to_customer_id").references(() => users.id, { onDelete: "set null" }),
     couponCode: varchar("coupon_code", { length: 50 }).notNull(),
     type: couponTypeEnum("type").notNull(),
     value: doublePrecision("value").notNull(),

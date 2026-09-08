@@ -8,6 +8,7 @@ import {
   bookingCoupons,
   couponUsages,
   coupons,
+  payments,
   salons,
   branches,
   staff,
@@ -47,6 +48,10 @@ interface CreateBookingParams {
   // (repositories never validate/throw AppError). Optional: only present when the request
   // carried a couponCode.
   coupon?: AppliedCoupon;
+  // Module 16 — frozen at creation time by BookingService (see StrikeService); the repository
+  // just persists what it's told, same as everything else in this file.
+  requiresAdvancePayment: boolean;
+  advanceAmount: number | null;
 }
 
 export class BookingRepository {
@@ -118,9 +123,13 @@ export class BookingRepository {
     return result;
   }
 
-  async listByCustomer(customerId: string, status?: string) {
+  async listByCustomer(customerId: string, status?: string | string[]) {
     const conditions = [eq(bookings.customerId, customerId)];
-    if (status) conditions.push(eq(bookings.bookingStatus, status as never));
+    if (Array.isArray(status)) {
+      if (status.length > 0) conditions.push(inArray(bookings.bookingStatus, status as never[]));
+    } else if (status) {
+      conditions.push(eq(bookings.bookingStatus, status as never));
+    }
     return db
       .select()
       .from(bookings)
@@ -194,6 +203,8 @@ export class BookingRepository {
           taxAmount: 0,
           totalAmount,
           notes: params.notes,
+          requiresAdvancePayment: params.requiresAdvancePayment,
+          advanceAmount: params.advanceAmount,
           approvedAt: params.bookingStatus === "APPROVED" ? new Date() : null,
         })
         .returning();
@@ -313,6 +324,36 @@ export class BookingRepository {
       .update(bookingRescheduleRequests)
       .set({ status, respondedAt: new Date(), responseReason })
       .where(eq(bookingRescheduleRequests.id, requestId))
+      .returning();
+    return row;
+  }
+
+  // ---- Module 16: strikes / advance payment ----
+
+  /** Own copy of PaymentRepository's payments lookup, same "own repository, direct cross-table
+   * query" precedent as findNamesForBookings above (salons/branches/staff). */
+  async findSuccessfulAdvancePayment(bookingId: string) {
+    const [row] = await db
+      .select()
+      .from(payments)
+      .where(and(eq(payments.bookingId, bookingId), eq(payments.purpose, "ADVANCE"), eq(payments.status, "SUCCESS")))
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** Forfeiture coupon issued when a restricted customer cancels a booking they already paid
+   * an advance on — restrictedToCustomerId keeps it unusable by anyone else. */
+  async createForfeitureCoupon(params: { couponCode: string; customerId: string; amount: number }) {
+    const [row] = await db
+      .insert(coupons)
+      .values({
+        couponCode: params.couponCode,
+        type: "FIXED",
+        value: params.amount,
+        restrictedToCustomerId: params.customerId,
+        usageLimit: 1,
+        active: true,
+      })
       .returning();
     return row;
   }

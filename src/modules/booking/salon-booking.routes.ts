@@ -45,6 +45,16 @@ router.post(
   asyncHandler((req, res) => controller.proposeReschedule(req, res))
 );
 
+// Module 16 — no documented contract existed anywhere for NO_SHOW (context.md flagged the
+// enum gap itself; TRD §13's approval flow mentions it only as "generate the booking
+// check-in OTP," which this codebase never built). Co-defined with the user: owner marks it
+// manually, any time after scheduledStart.
+router.post(
+  "/:id/no-show",
+  validate({ params: bookingIdParamSchema }),
+  asyncHandler((req, res) => controller.markNoShow(req, res))
+);
+
 // POST /salon-bookings/:id/block-slot is explicitly "Future Feature — Not MVP" in
 // frontend_handover.md — deliberately not implemented.
 

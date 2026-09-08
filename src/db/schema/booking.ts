@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, doublePrecision, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, boolean, doublePrecision, timestamp, index } from "drizzle-orm/pg-core";
 import {
   bookingStatusEnum,
   bookingTypeEnum,
@@ -52,10 +52,16 @@ export const bookings = pgTable(
     rejectionReason: text("rejection_reason"),
     cancellationReason: text("cancellation_reason"),
     rescheduleReason: text("reschedule_reason"),
+    // Module 16 — customer-strikes/advance-payment policy. Set at creation time when the
+    // customer already has 4+ lifetime NO_SHOW strikes (see src/modules/strike). Amount is a
+    // frozen snapshot (10% of this booking's totalAmount at creation), never recomputed later.
+    requiresAdvancePayment: boolean("requires_advance_payment").notNull().default(false),
+    advanceAmount: doublePrecision("advance_amount"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     expiredAt: timestamp("expired_at", { withTimezone: true }),
+    noShowAt: timestamp("no_show_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

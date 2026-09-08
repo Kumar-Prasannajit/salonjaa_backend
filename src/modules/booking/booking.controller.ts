@@ -69,4 +69,9 @@ export class BookingController {
     const booking = await bookingService.walkIn(req.user!.id, req.body);
     res.status(201).json({ success: true, data: booking });
   }
+
+  async markNoShow(req: Request, res: Response): Promise<void> {
+    const booking = await bookingService.markNoShow(req.user!.id, req.params.id);
+    res.status(200).json({ success: true, data: booking });
+  }
 }

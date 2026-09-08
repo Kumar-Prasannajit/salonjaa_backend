@@ -4,6 +4,7 @@ import { SalonService } from "@/modules/salon/salon.service";
 import { BranchService } from "@/modules/branch/branch.service";
 import { StaffService } from "@/modules/staff/staff.service";
 import { NotificationService } from "@/modules/notification/notification.service";
+import { StrikeService } from "@/modules/strike/strike.service";
 import {
   ApproveBookingInput,
   BookingDTO,
@@ -17,8 +18,8 @@ import {
 } from "@/modules/booking/booking.types";
 import { BadRequestError, ConflictError, NotFoundError, UnprocessableEntityError } from "@/shared/errors";
 import { assertCouponEligible, computeCouponDiscount } from "@/shared/coupon";
-import { generateBookingNumber } from "@/shared/crypto";
-import { CAPACITY_CONSUMING_BOOKING_STATUSES, ROLE_NAMES } from "@/shared/constants";
+import { generateBookingNumber, generateCouponCode } from "@/shared/crypto";
+import { CANCELLATION_CUTOFF_HOURS, CAPACITY_CONSUMING_BOOKING_STATUSES, ROLE_NAMES } from "@/shared/constants";
 import { env } from "@/config/env";
 import { scheduleBookingExpiry } from "@/queues/booking-expiry.queue";
 import { scheduleBookingCompletion, rescheduleBookingCompletion } from "@/queues/booking-completion.queue";
@@ -35,7 +36,8 @@ export class BookingService {
     private readonly salonService: SalonService = new SalonService(),
     private readonly branchService: BranchService = new BranchService(),
     private readonly staffService: StaffService = new StaffService(),
-    private readonly notificationService: NotificationService = new NotificationService()
+    private readonly notificationService: NotificationService = new NotificationService(),
+    private readonly strikeService: StrikeService = new StrikeService()
   ) {}
 
   async create(userId: string, input: CreateBookingInput): Promise<{ bookingId: string; status: string }> {
@@ -65,7 +67,21 @@ export class BookingService {
       branch.totalChairs
     );
 
-    const coupon = input.couponCode ? await this.resolveCoupon(input.couponCode, lines) : undefined;
+    const coupon = input.couponCode ? await this.resolveCoupon(input.couponCode, lines, userId) : undefined;
+    const paymentMethod = input.paymentMethod ?? "ONLINE";
+
+    // Module 16 — a restricted customer (4+ lifetime NO_SHOW strikes) choosing PAY_AT_SALON
+    // now needs a 10% advance deposit before the salon reviews it; choosing ONLINE already
+    // pays the full amount upfront, which already exceeds what the advance is meant to
+    // secure, so no separate advance is layered on top of it.
+    let requiresAdvancePayment = false;
+    let advanceAmount: number | null = null;
+    if (paymentMethod === "PAY_AT_SALON" && (await this.strikeService.isAdvancePaymentRequired(userId))) {
+      requiresAdvancePayment = true;
+      const subtotalAmount = lines.reduce((sum, l) => sum + l.totalAmount, 0);
+      const totalAmount = subtotalAmount - (coupon?.discountAmount ?? 0);
+      advanceAmount = this.strikeService.computeAdvanceAmount(totalAmount);
+    }
 
     const booking = await this.createWithRetry({
       customerId: userId,
@@ -75,7 +91,7 @@ export class BookingService {
       branchId: input.branchId,
       bookingType: "ONLINE",
       bookingStatus: "PENDING",
-      paymentMethod: input.paymentMethod ?? "ONLINE",
+      paymentMethod,
       selectedStaffId: input.staffId ?? null,
       scheduledStart: start,
       scheduledEnd: end,
@@ -85,6 +101,8 @@ export class BookingService {
       services: lines,
       changedByUserId: userId,
       coupon,
+      requiresAdvancePayment,
+      advanceAmount,
     });
 
     await scheduleBookingExpiry(booking.id, env.BOOKING_DEFAULT_EXPIRY_HOURS * 60 * 60 * 1000);
@@ -118,6 +136,20 @@ export class BookingService {
     return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
   }
 
+  /**
+   * Backs GET /users/me/bookings (Module 2's deferred endpoint, closed out now that Booking
+   * exists — see docs/PROGRESS.md). Its documented status filter (`COMPLETED|CANCELLED|
+   * UPCOMING`) doesn't match any real `bookingStatus` value 1:1 — COMPLETED/CANCELLED map
+   * directly, UPCOMING is synthetic (any not-yet-resolved booking: PENDING/AWAITING_PAYMENT/
+   * APPROVED — the same set `isCapacityConsuming` already treats as "still active").
+   */
+  async listMyBookingHistory(userId: string, status?: "COMPLETED" | "CANCELLED" | "UPCOMING"): Promise<BookingDTO[]> {
+    const statusFilter = status === "UPCOMING" ? [...CAPACITY_CONSUMING_BOOKING_STATUSES] : status;
+    const rows = await this.repo.listByCustomer(userId, statusFilter);
+    const names = await this.repo.findNamesForBookings(rows);
+    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
+  }
+
   async listSalonBookings(userId: string, status?: string): Promise<BookingDTO[]> {
     const salons = await this.salonService.listMySalons(userId);
     const rows = await this.repo.listBySalonIds(
@@ -129,11 +161,13 @@ export class BookingService {
   }
 
   /**
-   * PROVISIONAL cancellation policy: any PENDING/APPROVED booking can be cancelled by its
-   * customer at any time before scheduled_start, no cutoff, no strike ever recorded. The
-   * client's actual cancellation/strike policy is still being decided (context.md Pending
-   * Decisions) — the user explicitly asked to ship this safe placeholder now rather than
-   * wait. Revisit when the real policy is finalized.
+   * Cancellation policy (finalized Module 16 — was provisional/no-cutoff before): a
+   * PENDING/APPROVED/AWAITING_PAYMENT booking can be cancelled by its customer any time up to
+   * CANCELLATION_CUTOFF_HOURS before scheduledStart; inside that window, cancellation is
+   * blocked entirely (decided with the user — no "late cancel with strike" path).
+   *
+   * If this booking had a paid advance deposit (Module 16 strikes policy), that deposit is
+   * forfeited rather than refunded — see issueForfeitureCoupon.
    */
   async cancel(userId: string, bookingId: string, reason?: string): Promise<BookingDTO> {
     const booking = await this.repo.findById(bookingId);
@@ -143,6 +177,10 @@ export class BookingService {
     if (!this.isCapacityConsuming(booking.bookingStatus)) {
       throw new ConflictError("Booking cannot be cancelled in its current state");
     }
+    const hoursUntilStart = (booking.scheduledStart.getTime() - Date.now()) / 3_600_000;
+    if (hoursUntilStart < CANCELLATION_CUTOFF_HOURS) {
+      throw new ConflictError(`Cancellation is only allowed until ${CANCELLATION_CUTOFF_HOURS} hours before the scheduled time`);
+    }
     const updated = await this.repo.transitionStatus(
       bookingId,
       booking.bookingStatus,
@@ -151,6 +189,10 @@ export class BookingService {
       userId,
       reason
     );
+
+    if (booking.requiresAdvancePayment) {
+      await this.issueForfeitureCoupon(booking);
+    }
 
     const ownerUserId = await this.salonService.findOwnerUserId(booking.salonId);
     if (ownerUserId) {
@@ -197,13 +239,30 @@ export class BookingService {
     return this.toRescheduleDTO(request);
   }
 
-  /** No requestId in the documented route — always resolves the latest PENDING request. */
+  /**
+   * No requestId in the documented route — always resolves the latest PENDING request.
+   *
+   * Handles BOTH directions on the same endpoint (context.md's Pending Decisions flagged this
+   * exact gap: "supplied inventory gives owner approve/reject endpoints while BRD also
+   * requires customer response to salon proposals" — no separate customer-facing route name
+   * was ever specified). Resolved by making the responder generic: whoever did NOT propose
+   * the pending request is the one who must respond — a CUSTOMER-initiated request needs the
+   * owning Salon Owner to act (existing behavior, unchanged), a SALON-initiated request needs
+   * the booking's own customer to act. See `assertRescheduleResponder`. Route-level
+   * `requireRole(SALON_OWNER)` was removed for this reason — `requireAuth` (from the router's
+   * `router.use`) plus this in-service check is now what gates it, same "ownership checked in
+   * the service, not the route" pattern as GET /bookings/:id.
+   */
   async approveReschedule(userId: string, bookingId: string): Promise<BookingDTO> {
-    const booking = await this.assertOwnedBooking(userId, bookingId);
+    const booking = await this.repo.findById(bookingId);
+    if (!booking) {
+      throw new NotFoundError("Booking not found");
+    }
     const request = await this.repo.findLatestPendingRescheduleRequest(bookingId);
     if (!request) {
       throw new NotFoundError("No pending reschedule request for this booking");
     }
+    await this.assertRescheduleResponder(userId, booking, request);
 
     const branch = await this.availabilityRepo.findBookableBranch(booking.branchId);
     if (!branch) {
@@ -228,32 +287,25 @@ export class BookingService {
     if (booking.bookingStatus === "APPROVED") {
       await rescheduleBookingCompletion(bookingId, request.newScheduledEnd.getTime() - Date.now());
     }
-    if (booking.customerId) {
-      await this.notificationService.notify({
-        userId: booking.customerId,
-        eventType: "BOOKING_RESCHEDULE_APPROVED",
-        data: { bookingNumber: booking.bookingNumber },
-      });
-    }
+    // Notify whoever proposed the change, not whoever just responded to it.
+    await this.notifyRescheduleResolution(booking, request.requestedBy, "BOOKING_RESCHEDULE_APPROVED");
 
     return this.toDTO(updated);
   }
 
   async rejectReschedule(userId: string, bookingId: string, reason?: string): Promise<RescheduleRequestDTO> {
-    const booking = await this.assertOwnedBooking(userId, bookingId);
+    const booking = await this.repo.findById(bookingId);
+    if (!booking) {
+      throw new NotFoundError("Booking not found");
+    }
     const request = await this.repo.findLatestPendingRescheduleRequest(bookingId);
     if (!request) {
       throw new NotFoundError("No pending reschedule request for this booking");
     }
+    await this.assertRescheduleResponder(userId, booking, request);
     const updated = await this.repo.resolveRescheduleRequest(request.id, "REJECTED", reason);
 
-    if (booking.customerId) {
-      await this.notificationService.notify({
-        userId: booking.customerId,
-        eventType: "BOOKING_RESCHEDULE_REJECTED",
-        data: { bookingNumber: booking.bookingNumber },
-      });
-    }
+    await this.notifyRescheduleResolution(booking, request.requestedBy, "BOOKING_RESCHEDULE_REJECTED");
 
     return this.toRescheduleDTO(updated);
   }
@@ -262,6 +314,15 @@ export class BookingService {
     const booking = await this.assertOwnedBooking(userId, bookingId);
     if (booking.bookingStatus !== "PENDING") {
       throw new ConflictError("Only a pending booking can be approved");
+    }
+
+    // Module 16 — a restricted customer's advance deposit must clear before the owner can
+    // even approve, not just before payment: it's the whole point of requiring it upfront.
+    if (booking.requiresAdvancePayment) {
+      const advancePayment = await this.repo.findSuccessfulAdvancePayment(bookingId);
+      if (!advancePayment) {
+        throw new ConflictError("This booking's advance payment hasn't been completed yet");
+      }
     }
 
     // TRD: "Re-read ... selected stylist availability in the transaction" before approving.
@@ -428,6 +489,10 @@ export class BookingService {
       notes: null,
       services: lines,
       changedByUserId: userId,
+      // Module 16 — a walk-in has no customerId, so there's no strikes history to check
+      // against; the advance-payment policy simply doesn't apply to it.
+      requiresAdvancePayment: false,
+      advanceAmount: null,
     });
 
     // No notification — walk-in customers have no account (customerId is null).
@@ -436,7 +501,66 @@ export class BookingService {
     return this.toDTO(booking);
   }
 
+  /**
+   * Module 16 — no documented contract existed for this anywhere (context.md flagged the
+   * NO_SHOW enum gap itself). Co-defined with the user: owning Salon Owner marks it manually,
+   * any time after scheduledStart, on a still-APPROVED booking. Records a NO_SHOW strike
+   * against the customer (skipped for a walk-in — no customerId to strike) — see
+   * src/modules/strike. Capacity releases naturally (NO_SHOW isn't in
+   * CAPACITY_CONSUMING_BOOKING_STATUSES); any already-scheduled completion job safely no-ops
+   * (it re-checks the booking is still APPROVED before acting, same as every other delayed
+   * job in this codebase).
+   */
+  async markNoShow(userId: string, bookingId: string): Promise<BookingDTO> {
+    const booking = await this.assertOwnedBooking(userId, bookingId);
+    if (booking.bookingStatus !== "APPROVED") {
+      throw new ConflictError("Only an approved booking can be marked no-show");
+    }
+    if (booking.scheduledStart.getTime() > Date.now()) {
+      throw new BadRequestError("Cannot mark no-show before the scheduled start time");
+    }
+
+    const updated = await this.repo.transitionStatus(bookingId, booking.bookingStatus, "NO_SHOW", { noShowAt: new Date() }, userId);
+
+    if (booking.customerId) {
+      await this.strikeService.recordNoShow(booking.customerId, bookingId);
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_NO_SHOW",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
+    return this.toDTO(updated);
+  }
+
   // ---- Shared internals ----
+
+  /**
+   * Module 16 — the advance deposit on a strikes-restricted booking is non-refundable on
+   * cancellation (decided with the user), but rather than the customer simply losing it, it's
+   * converted into a single-use, customer-restricted coupon for the same amount — usable
+   * toward a future booking's total (which, since a future advance is 10% of that booking's
+   * total, naturally lowers the next advance too). Reuses the existing coupon machinery
+   * end-to-end rather than inventing a separate "advance credit" ledger.
+   */
+  private async issueForfeitureCoupon(booking: BookingRow): Promise<void> {
+    if (!booking.customerId || !booking.advanceAmount) return;
+    const advancePayment = await this.repo.findSuccessfulAdvancePayment(booking.id);
+    if (!advancePayment) return; // Advance was never actually paid — nothing to forfeit.
+
+    const couponCode = generateCouponCode();
+    await this.repo.createForfeitureCoupon({
+      couponCode,
+      customerId: booking.customerId,
+      amount: advancePayment.amount,
+    });
+    await this.notificationService.notify({
+      userId: booking.customerId,
+      eventType: "ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED",
+      data: { bookingNumber: booking.bookingNumber, couponCode, amount: String(advancePayment.amount) },
+    });
+  }
 
   /**
    * Validated eagerly, before the booking transaction opens — matches
@@ -453,14 +577,16 @@ export class BookingService {
    */
   private async resolveCoupon(
     couponCode: string,
-    lines: BookingServiceLine[]
+    lines: BookingServiceLine[],
+    customerId: string
   ): Promise<{ couponId: string; couponCode: string; couponType: "FIXED" | "PERCENTAGE"; discountAmount: number }> {
     const coupon = await this.repo.findActiveCouponByCode(couponCode);
     if (!coupon) {
       throw new UnprocessableEntityError("Coupon not found or inactive");
     }
     const subtotalAmount = lines.reduce((sum, l) => sum + l.totalAmount, 0);
-    assertCouponEligible(coupon, subtotalAmount);
+    // customerId enforces Module 16's restrictedToCustomerId (forfeiture coupons).
+    assertCouponEligible(coupon, subtotalAmount, customerId);
     const discountAmount = computeCouponDiscount(coupon, subtotalAmount);
     return { couponId: coupon.id, couponCode: coupon.couponCode, couponType: coupon.type, discountAmount };
   }
@@ -476,6 +602,56 @@ export class BookingService {
     }
     await this.salonService.assertOwned(userId, booking.salonId);
     return booking;
+  }
+
+  /**
+   * Whoever did NOT propose a pending reschedule request is the one who must respond to it —
+   * see approveReschedule's doc comment for why this replaces a role-only route gate.
+   * `NotFoundError` (not `ForbiddenError`) either way, matching the existing ownership-pattern
+   * philosophy of not leaking a resource's existence to a caller who isn't party to it.
+   */
+  private async assertRescheduleResponder(
+    userId: string,
+    booking: BookingRow,
+    request: { requestedBy: string }
+  ): Promise<void> {
+    if (request.requestedBy === "SALON") {
+      if (booking.customerId !== userId) {
+        throw new NotFoundError("Booking not found");
+      }
+      return;
+    }
+    await this.salonService.assertOwned(userId, booking.salonId);
+  }
+
+  /**
+   * Notifies whoever proposed the reschedule (not whoever just responded) that it was
+   * resolved. A CUSTOMER-initiated request resolves back to the customer (unchanged
+   * behavior); a SALON-initiated one resolves to the owner instead — reuses the existing
+   * customer-facing event copy for the former and a dedicated owner-facing pair for the
+   * latter (see notification.templates.ts).
+   */
+  private async notifyRescheduleResolution(
+    booking: BookingRow,
+    requestedBy: string,
+    outcome: "BOOKING_RESCHEDULE_APPROVED" | "BOOKING_RESCHEDULE_REJECTED"
+  ): Promise<void> {
+    if (requestedBy === "SALON") {
+      const ownerUserId = await this.salonService.findOwnerUserId(booking.salonId);
+      if (!ownerUserId) return;
+      await this.notificationService.notify({
+        userId: ownerUserId,
+        eventType: outcome === "BOOKING_RESCHEDULE_APPROVED" ? "BOOKING_RESCHEDULE_ACCEPTED_BY_CUSTOMER" : "BOOKING_RESCHEDULE_DECLINED_BY_CUSTOMER",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+      return;
+    }
+    if (!booking.customerId) return;
+    await this.notificationService.notify({
+      userId: booking.customerId,
+      eventType: outcome,
+      data: { bookingNumber: booking.bookingNumber },
+    });
   }
 
   private async getBookingServiceIds(bookingId: string): Promise<string[]> {
@@ -610,6 +786,8 @@ export class BookingService {
       services: BookingServiceLine[];
       changedByUserId: string | null;
       coupon?: { couponId: string; couponCode: string; couponType: "FIXED" | "PERCENTAGE"; discountAmount: number };
+      requiresAdvancePayment: boolean;
+      advanceAmount: number | null;
     },
     attempt = 0
   ): Promise<BookingRow> {
@@ -655,6 +833,9 @@ export class BookingService {
       completedAt: booking.completedAt?.toISOString() ?? null,
       cancelledAt: booking.cancelledAt?.toISOString() ?? null,
       expiredAt: booking.expiredAt?.toISOString() ?? null,
+      noShowAt: booking.noShowAt?.toISOString() ?? null,
+      requiresAdvancePayment: booking.requiresAdvancePayment,
+      advanceAmount: booking.advanceAmount,
       createdAt: booking.createdAt.toISOString(),
       services: services?.map((s) => ({
         serviceId: s.serviceId,

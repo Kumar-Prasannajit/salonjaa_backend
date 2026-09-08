@@ -12,3 +12,4 @@ export * from "@/db/schema/payment";
 export * from "@/db/schema/review";
 export * from "@/db/schema/admin";
 export * from "@/db/schema/complaint";
+export * from "@/db/schema/strike";

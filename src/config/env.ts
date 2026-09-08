@@ -27,7 +27,7 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN_DAYS: z.coerce.number().int().positive().default(30),
 
   OTP_LENGTH: z.coerce.number().int().min(4).max(10).default(6),
-  OTP_EXPIRY_SECONDS: z.coerce.number().int().positive().default(300),
+  OTP_EXPIRY_SECONDS: z.coerce.number().int().positive().default(600),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
   OTP_RATE_LIMIT_WINDOW_SECONDS: z.coerce

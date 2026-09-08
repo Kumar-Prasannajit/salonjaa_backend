@@ -15,6 +15,10 @@ import adminRefundRoutes from "@/modules/admin/admin-refund.routes";
 import adminComplaintRoutes from "@/modules/admin/admin-complaint.routes";
 import complaintRoutes from "@/modules/complaint/complaint.routes";
 import adminReportRoutes from "@/modules/admin/admin-report.routes";
+import adminStrikeRoutes from "@/modules/admin/admin-strike.routes";
+import adminCategoryRoutes from "@/modules/admin/admin-category.routes";
+import adminCouponRoutes from "@/modules/admin/admin-coupon.routes";
+import adminSettlementRoutes from "@/modules/admin/admin-settlement.routes";
 import publicBranchRoutes from "@/modules/browse/public-branch.routes";
 import serviceCategoryRoutes from "@/modules/browse/service-category.routes";
 
@@ -36,6 +40,10 @@ router.use("/admin/refunds", adminRefundRoutes);
 router.use("/admin/complaints", adminComplaintRoutes);
 router.use("/complaints", complaintRoutes);
 router.use("/admin/reports", adminReportRoutes);
+router.use("/admin/customers/:customerId/strikes", adminStrikeRoutes);
+router.use("/admin/categories", adminCategoryRoutes);
+router.use("/admin/coupons", adminCouponRoutes);
+router.use("/admin/settlements", adminSettlementRoutes);
 router.use("/public/branches", publicBranchRoutes);
 router.use("/service-categories", serviceCategoryRoutes);
 

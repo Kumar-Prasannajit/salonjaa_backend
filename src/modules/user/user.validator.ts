@@ -10,3 +10,7 @@ export const updateProfileSchema = z.object({
     .refine((val) => new Date(val).getTime() < Date.now(), "dob must be in the past")
     .optional(),
 });
+
+export const myBookingHistoryQuerySchema = z.object({
+  status: z.enum(["COMPLETED", "CANCELLED", "UPCOMING"]).optional(),
+});

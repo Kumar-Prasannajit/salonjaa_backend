@@ -40,6 +40,20 @@ export class PaymentService {
     if (!booking || booking.customerId !== userId) {
       throw new NotFoundError("Booking not found");
     }
+
+    // Module 16 — a restricted customer's PAY_AT_SALON booking needs its advance settled
+    // before the salon can even review it, independent of the normal AWAITING_PAYMENT flow
+    // below (which this booking's paymentMethod never enters — the remainder is still paid
+    // at the salon). Checked first since it applies to a still-PENDING booking.
+    if (booking.requiresAdvancePayment) {
+      const alreadyPaid = await this.bookingRepo.findSuccessfulAdvancePayment(booking.id);
+      if (!alreadyPaid) {
+        return this.createAdvanceOrder(userId, booking);
+      }
+      // Advance already paid — fall through. The booking's own paymentMethod (PAY_AT_SALON)
+      // never reaches AWAITING_PAYMENT, so the check below correctly rejects a redundant call.
+    }
+
     // Module 14b — payment can now only be created during the booking's AWAITING_PAYMENT
     // window (salon approved an ONLINE booking, payment due within
     // BOOKING_PAYMENT_WINDOW_MINUTES). A PAY_AT_SALON booking never enters AWAITING_PAYMENT,
@@ -49,7 +63,7 @@ export class PaymentService {
       throw new ConflictError("Booking must be awaiting payment before an order can be created");
     }
 
-    const existing = await this.repo.findActivePaymentForBooking(booking.id);
+    const existing = await this.repo.findActivePaymentForBooking(booking.id, "FULL");
     if (existing) {
       throw new ConflictError("A payment already exists for this booking");
     }
@@ -60,6 +74,7 @@ export class PaymentService {
       bookingId: booking.id,
       customerId: userId,
       method: "ONLINE",
+      purpose: "FULL",
       provider: "RAZORPAY",
       providerOrderId: order.orderId,
       amount: booking.totalAmount,
@@ -78,6 +93,54 @@ export class PaymentService {
     // (no webhook ever tells us) leaves this payment PENDING forever, and create-order's
     // "only a FAILED payment can be retried" rule permanently blocks a retry. See
     // cancelPendingPayment() below for the immediate/explicit counterpart to this backstop.
+    await schedulePaymentExpiry(payment.id, env.PAYMENT_ORDER_EXPIRY_MINUTES * 60 * 1000);
+
+    return { orderId: order.orderId, amount: order.amount, currency: order.currency };
+  }
+
+  /**
+   * Module 16 — the advance-payment counterpart to the FULL flow above, reusing the same
+   * Razorpay order + PENDING-payment + expiry-job shape. Fires while the booking is still
+   * PENDING (before the owner can approve it) rather than at AWAITING_PAYMENT, since a
+   * PAY_AT_SALON booking never reaches that status — only the advance amount is collected
+   * online here, the remainder stays pay-at-salon as normal.
+   */
+  private async createAdvanceOrder(
+    userId: string,
+    booking: { id: string; bookingStatus: string; advanceAmount: number | null }
+  ): Promise<{ orderId: string; amount: number; currency: string }> {
+    if (booking.bookingStatus !== "PENDING") {
+      throw new ConflictError("Advance payment window has passed for this booking");
+    }
+    if (booking.advanceAmount === null) {
+      throw new ConflictError("This booking has no advance amount set");
+    }
+    const existing = await this.repo.findActivePaymentForBooking(booking.id, "ADVANCE");
+    if (existing) {
+      throw new ConflictError("An advance payment already exists for this booking");
+    }
+
+    const order = await paymentProvider.createOrder(booking.advanceAmount, "INR", booking.id);
+
+    const payment = await this.repo.createPayment({
+      bookingId: booking.id,
+      customerId: userId,
+      method: "ONLINE",
+      purpose: "ADVANCE",
+      provider: "RAZORPAY",
+      providerOrderId: order.orderId,
+      amount: booking.advanceAmount,
+      currency: "INR",
+      status: "PENDING",
+    });
+
+    await this.repo.createTransaction({
+      paymentId: payment.id,
+      provider: "RAZORPAY",
+      providerOrderId: order.orderId,
+      status: "PENDING",
+    });
+
     await schedulePaymentExpiry(payment.id, env.PAYMENT_ORDER_EXPIRY_MINUTES * 60 * 1000);
 
     return { orderId: order.orderId, amount: order.amount, currency: order.currency };
@@ -137,6 +200,15 @@ export class PaymentService {
           data: { bookingNumber: booking.bookingNumber },
         });
       }
+    } else if (booking && payment.purpose === "ADVANCE" && booking.customerId) {
+      // Module 16 — an ADVANCE payment doesn't move the booking's status (it stays PENDING,
+      // same as before this payment — the owner still reviews it normally); just let the
+      // customer know the deposit went through.
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "ADVANCE_PAYMENT_RECEIVED",
+        data: { bookingNumber: booking.bookingNumber, amount: String(payment.amount) },
+      });
     }
 
     return { success: true, paymentStatus: "SUCCESS" };
@@ -248,13 +320,14 @@ export class PaymentService {
    * Pure preview check, no side effects — no documented endpoint ever attaches a coupon to a
    * booking (POST /bookings has no couponCode field), so usage isn't recorded here.
    */
-  async validateCoupon(input: ValidateCouponInput): Promise<{ valid: true; discount: number }> {
+  async validateCoupon(input: ValidateCouponInput, customerId: string): Promise<{ valid: true; discount: number }> {
     const coupon = await this.repo.findActiveCouponByCode(input.couponCode);
     if (!coupon) {
       throw new UnprocessableEntityError("Coupon not found or inactive");
     }
     // Shared with BookingService's coupon attach (Module 12) — see src/shared/coupon.ts.
-    assertCouponEligible(coupon, input.bookingAmount);
+    // customerId enforces Module 16's restrictedToCustomerId (forfeiture coupons).
+    assertCouponEligible(coupon, input.bookingAmount, customerId);
     const discount = computeCouponDiscount(coupon, input.bookingAmount);
     return { valid: true, discount };
   }

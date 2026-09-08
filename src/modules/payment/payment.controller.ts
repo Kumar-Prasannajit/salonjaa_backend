@@ -50,7 +50,7 @@ export class PaymentController {
 
   /** POST /payments/coupons/validate -> { valid, discount } exactly per frontend_handover.md */
   async validateCoupon(req: Request, res: Response): Promise<void> {
-    const result = await paymentService.validateCoupon(req.body);
+    const result = await paymentService.validateCoupon(req.body, req.user!.id);
     res.status(200).json(result);
   }
 }
