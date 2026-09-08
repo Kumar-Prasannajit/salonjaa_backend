@@ -42,9 +42,8 @@ export interface PublicBranchDetailDTO {
   branchName: string;
   description: string | null;
   coverImage: string | null;
-  // Always empty — `salon_gallery_images` doesn't exist yet (deferred in Module 3, still no
-  // documented contract). Kept as a field so the frontend's card layout doesn't need a branch
-  // when this ships for real later.
+  // Module 16 — image URLs from salon_gallery_images (SalonService.listGallery), ordered by
+  // displayOrder. Empty for a salon that hasn't added any yet.
   gallery: string[];
   city: string;
   addressLine1: string;

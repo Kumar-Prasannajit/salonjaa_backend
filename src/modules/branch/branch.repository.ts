@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/config/database";
-import { branches, branchHolidays, branchCapacityRules, salons, salonOwnerProfiles } from "@/db/schema";
-import { CreateBranchInput, UpdateBranchInput } from "@/modules/branch/branch.types";
+import { branches, branchHolidays, branchCapacityRules, branchSlotTemplates, salons, salonOwnerProfiles } from "@/db/schema";
+import { CreateBranchInput, UpdateBranchInput, SlotTemplateInput } from "@/modules/branch/branch.types";
 
 export class BranchRepository {
   /** Verifies the branch's parent salon belongs to the given owner-profile user. */
@@ -121,5 +121,54 @@ export class BranchRepository {
 
     const [created] = await db.insert(branchCapacityRules).values({ branchId, maxCapacityOverride }).returning();
     return created;
+  }
+
+  // ---- Module 16: slot templates ----
+
+  async listSlotTemplates(branchId: string) {
+    return db.select().from(branchSlotTemplates).where(eq(branchSlotTemplates.branchId, branchId));
+  }
+
+  async listActiveSlotTemplates(branchId: string) {
+    return db
+      .select()
+      .from(branchSlotTemplates)
+      .where(and(eq(branchSlotTemplates.branchId, branchId), eq(branchSlotTemplates.active, true)));
+  }
+
+  async createSlotTemplate(branchId: string, input: SlotTemplateInput) {
+    const [row] = await db
+      .insert(branchSlotTemplates)
+      .values({
+        branchId,
+        name: input.name,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        slotDurationMinutes: input.slotDurationMinutes,
+      })
+      .returning();
+    return row;
+  }
+
+  async findSlotTemplate(branchId: string, templateId: string) {
+    const [row] = await db
+      .select()
+      .from(branchSlotTemplates)
+      .where(and(eq(branchSlotTemplates.id, templateId), eq(branchSlotTemplates.branchId, branchId)))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async updateSlotTemplate(templateId: string, input: Partial<SlotTemplateInput> & { active?: boolean }) {
+    const [row] = await db
+      .update(branchSlotTemplates)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(branchSlotTemplates.id, templateId))
+      .returning();
+    return row ?? null;
+  }
+
+  async deleteSlotTemplate(templateId: string): Promise<void> {
+    await db.delete(branchSlotTemplates).where(eq(branchSlotTemplates.id, templateId));
   }
 }

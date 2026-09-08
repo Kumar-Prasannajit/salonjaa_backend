@@ -13,6 +13,8 @@ import { startPaymentExpiryWorker, stopPaymentExpiryWorker } from "@/queues/paym
 import { closePaymentExpiryQueue } from "@/queues/payment-expiry.queue";
 import { startPaymentWindowExpiryWorker, stopPaymentWindowExpiryWorker } from "@/queues/payment-window-expiry.worker";
 import { closePaymentWindowExpiryQueue } from "@/queues/payment-window-expiry.queue";
+import { startPromotionDeactivateWorker, stopPromotionDeactivateWorker } from "@/queues/promotion-deactivate.worker";
+import { closePromotionDeactivateQueue } from "@/queues/promotion-deactivate.queue";
 
 async function main(): Promise<void> {
   await checkDatabaseConnection();
@@ -28,6 +30,7 @@ async function main(): Promise<void> {
   startNotificationSendWorker();
   startPaymentExpiryWorker();
   startPaymentWindowExpiryWorker();
+  startPromotionDeactivateWorker();
 
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
@@ -42,6 +45,8 @@ async function main(): Promise<void> {
       await closePaymentExpiryQueue();
       await stopPaymentWindowExpiryWorker();
       await closePaymentWindowExpiryQueue();
+      await stopPromotionDeactivateWorker();
+      await closePromotionDeactivateQueue();
       await closeDatabaseConnection();
       await closeRedisConnection();
       process.exit(0);

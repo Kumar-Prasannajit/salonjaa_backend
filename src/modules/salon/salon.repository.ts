@@ -1,6 +1,6 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/config/database";
-import { salonOwnerProfiles, salons } from "@/db/schema";
+import { salonOwnerProfiles, salons, salonGalleryImages } from "@/db/schema";
 import { CreateSalonInput, UpdateSalonInput } from "@/modules/salon/salon.types";
 
 export class SalonRepository {
@@ -80,5 +80,33 @@ export class SalonRepository {
 
   async softDelete(salonId: string) {
     await db.update(salons).set({ deletedAt: new Date() }).where(eq(salons.id, salonId));
+  }
+
+  // ---- Module 16: gallery ----
+
+  async listGalleryImages(salonId: string) {
+    return db
+      .select()
+      .from(salonGalleryImages)
+      .where(and(eq(salonGalleryImages.salonId, salonId), isNull(salonGalleryImages.deletedAt)))
+      .orderBy(asc(salonGalleryImages.displayOrder));
+  }
+
+  async createGalleryImage(salonId: string, imageUrl: string, displayOrder: number) {
+    const [row] = await db.insert(salonGalleryImages).values({ salonId, imageUrl, displayOrder }).returning();
+    return row;
+  }
+
+  async findGalleryImage(salonId: string, imageId: string) {
+    const [row] = await db
+      .select()
+      .from(salonGalleryImages)
+      .where(and(eq(salonGalleryImages.id, imageId), eq(salonGalleryImages.salonId, salonId), isNull(salonGalleryImages.deletedAt)))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async softDeleteGalleryImage(imageId: string): Promise<void> {
+    await db.update(salonGalleryImages).set({ deletedAt: new Date() }).where(eq(salonGalleryImages.id, imageId));
   }
 }

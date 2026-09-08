@@ -1,6 +1,6 @@
 import { SalonRepository } from "@/modules/salon/salon.repository";
-import { CreateSalonInput, SalonDTO, SalonListItemDTO, UpdateSalonInput } from "@/modules/salon/salon.types";
-import { NotFoundError } from "@/shared/errors";
+import { AddGalleryImageInput, CreateSalonInput, GalleryImageDTO, SalonDTO, SalonListItemDTO, UpdateSalonInput } from "@/modules/salon/salon.types";
+import { ConflictError, NotFoundError } from "@/shared/errors";
 
 export class SalonService {
   constructor(private readonly repo: SalonRepository = new SalonRepository()) {}
@@ -57,6 +57,45 @@ export class SalonService {
       throw new NotFoundError("Salon not found");
     }
     return salon;
+  }
+
+  // ---- Module 16: gallery ----
+
+  async listGallery(salonId: string): Promise<GalleryImageDTO[]> {
+    // Public read (no ownership check) — used by GET /public/branches/:branchId to embed a
+    // salon's gallery, same visibility philosophy as the rest of that endpoint.
+    const rows = await this.repo.listGalleryImages(salonId);
+    return rows.map((r) => this.toGalleryDTO(r));
+  }
+
+  async addGalleryImage(userId: string, salonId: string, input: AddGalleryImageInput): Promise<GalleryImageDTO> {
+    await this.assertOwned(userId, salonId);
+    const existing = await this.repo.listGalleryImages(salonId);
+    const displayOrder = input.displayOrder ?? existing.length;
+    if (existing.some((img) => img.displayOrder === displayOrder)) {
+      throw new ConflictError(`An active image already occupies displayOrder ${displayOrder}`);
+    }
+    const row = await this.repo.createGalleryImage(salonId, input.imageUrl, displayOrder);
+    return this.toGalleryDTO(row);
+  }
+
+  async removeGalleryImage(userId: string, salonId: string, imageId: string): Promise<void> {
+    await this.assertOwned(userId, salonId);
+    const image = await this.repo.findGalleryImage(salonId, imageId);
+    if (!image) {
+      throw new NotFoundError("Gallery image not found");
+    }
+    await this.repo.softDeleteGalleryImage(imageId);
+  }
+
+  private toGalleryDTO(row: { id: string; salonId: string; imageUrl: string; displayOrder: number; createdAt: Date }): GalleryImageDTO {
+    return {
+      id: row.id,
+      salonId: row.salonId,
+      imageUrl: row.imageUrl,
+      displayOrder: row.displayOrder,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 
   private toDTO(salon: {

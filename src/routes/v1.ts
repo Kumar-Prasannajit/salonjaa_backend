@@ -21,6 +21,8 @@ import adminCouponRoutes from "@/modules/admin/admin-coupon.routes";
 import adminSettlementRoutes from "@/modules/admin/admin-settlement.routes";
 import publicBranchRoutes from "@/modules/browse/public-branch.routes";
 import serviceCategoryRoutes from "@/modules/browse/service-category.routes";
+import promotionRoutes from "@/modules/promotion/promotion.routes";
+import publicPromotionRoutes from "@/modules/browse/promotion.routes";
 
 const router = Router();
 
@@ -46,6 +48,8 @@ router.use("/admin/coupons", adminCouponRoutes);
 router.use("/admin/settlements", adminSettlementRoutes);
 router.use("/public/branches", publicBranchRoutes);
 router.use("/service-categories", serviceCategoryRoutes);
+router.use("/promotions", promotionRoutes);
+router.use("/public/promotions", publicPromotionRoutes);
 
 // Additional module routers are mounted here as each module is implemented:
 // ...

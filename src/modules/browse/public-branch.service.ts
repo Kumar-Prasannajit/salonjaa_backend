@@ -1,10 +1,14 @@
 import { PublicBranchRepository } from "@/modules/browse/public-branch.repository";
+import { SalonService } from "@/modules/salon/salon.service";
 import { BranchSearchQuery, PublicBranchDetailDTO, PublicBranchListItemDTO } from "@/modules/browse/public-branch.types";
 import { NotFoundError } from "@/shared/errors";
 import { haversineKm } from "@/shared/geo";
 
 export class PublicBranchService {
-  constructor(private readonly repo: PublicBranchRepository = new PublicBranchRepository()) {}
+  constructor(
+    private readonly repo: PublicBranchRepository = new PublicBranchRepository(),
+    private readonly salonService: SalonService = new SalonService()
+  ) {}
 
   async search(query: BranchSearchQuery): Promise<PublicBranchListItemDTO[]> {
     const rows = await this.repo.search({
@@ -59,9 +63,10 @@ export class PublicBranchService {
     }
     const { branch, salon } = row;
 
-    const [services, ratings] = await Promise.all([
+    const [services, ratings, gallery] = await Promise.all([
       this.repo.findActiveServicesWithCategory(branchId),
       this.repo.getRatingAggregates([branchId]),
+      this.salonService.listGallery(salon.id),
     ]);
     const rating = ratings.get(branchId);
 
@@ -72,7 +77,8 @@ export class PublicBranchService {
       branchName: branch.name,
       description: salon.description,
       coverImage: salon.coverImage,
-      gallery: [],
+      // Module 16 — was always an empty placeholder; now backed by salon_gallery_images.
+      gallery: gallery.map((g) => g.imageUrl),
       city: branch.city,
       addressLine1: branch.addressLine1,
       latitude: branch.latitude,

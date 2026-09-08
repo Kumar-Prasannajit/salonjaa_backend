@@ -29,3 +29,16 @@ export interface SalonListItemDTO {
   id: string;
   name: string;
 }
+
+export interface GalleryImageDTO {
+  id: string;
+  salonId: string;
+  imageUrl: string;
+  displayOrder: number;
+  createdAt: string;
+}
+
+export interface AddGalleryImageInput {
+  imageUrl: string;
+  displayOrder?: number;
+}

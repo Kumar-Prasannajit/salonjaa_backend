@@ -11,6 +11,9 @@ import {
   holidayIdParamSchema,
   createHolidaySchema,
   capacityRuleSchema,
+  slotTemplateIdParamSchema,
+  createSlotTemplateSchema,
+  updateSlotTemplateSchema,
 } from "@/modules/branch/branch.validator";
 import { ROLE_NAMES } from "@/shared/constants";
 
@@ -47,6 +50,29 @@ router.post(
   "/:id/capacity-rule",
   validate({ params: branchIdParamSchema, body: capacityRuleSchema }),
   asyncHandler((req, res) => controller.setCapacityRule(req, res))
+);
+
+// Module 16 — new CRUD (branch_slot_templates deferred since Module 3/5), wired into
+// AvailabilityService.buildCandidateWindows.
+router.get(
+  "/:id/slot-templates",
+  validate({ params: branchIdParamSchema }),
+  asyncHandler((req, res) => controller.listSlotTemplates(req, res))
+);
+router.post(
+  "/:id/slot-templates",
+  validate({ params: branchIdParamSchema, body: createSlotTemplateSchema }),
+  asyncHandler((req, res) => controller.createSlotTemplate(req, res))
+);
+router.patch(
+  "/:id/slot-templates/:templateId",
+  validate({ params: slotTemplateIdParamSchema, body: updateSlotTemplateSchema }),
+  asyncHandler((req, res) => controller.updateSlotTemplate(req, res))
+);
+router.delete(
+  "/:id/slot-templates/:templateId",
+  validate({ params: slotTemplateIdParamSchema }),
+  asyncHandler((req, res) => controller.deleteSlotTemplate(req, res))
 );
 
 export default router;

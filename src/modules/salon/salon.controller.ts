@@ -30,4 +30,21 @@ export class SalonController {
     await salonService.deleteMySalon(req.user!.id, req.params.salonId);
     sendNoContent(res);
   }
+
+  // ---- Module 16: gallery ----
+
+  async listGallery(req: Request, res: Response): Promise<void> {
+    const images = await salonService.listGallery(req.params.salonId);
+    sendSuccess(res, images);
+  }
+
+  async addGalleryImage(req: Request, res: Response): Promise<void> {
+    const image = await salonService.addGalleryImage(req.user!.id, req.params.salonId, req.body);
+    sendCreated(res, image);
+  }
+
+  async removeGalleryImage(req: Request, res: Response): Promise<void> {
+    await salonService.removeGalleryImage(req.user!.id, req.params.salonId, req.params.imageId);
+    sendNoContent(res);
+  }
 }

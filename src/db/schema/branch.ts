@@ -4,6 +4,7 @@ import {
   varchar,
   text,
   integer,
+  boolean,
   time,
   timestamp,
   date,
@@ -76,5 +77,28 @@ export const branchCapacityRules = pgTable(
   },
   (table) => ({
     branchUnique: uniqueIndex("branch_capacity_rules_branch_unique").on(table.branchId),
+  })
+);
+
+// TRD §4 — deferred since Module 3/5 ("no CRUD endpoint anywhere, so Availability generates
+// slots at a fixed DEFAULT_SLOT_INTERVAL_MINUTES instead"). Module 16 gives it a real CRUD
+// surface and wires it into AvailabilityService — see that module's buildCandidateWindows.
+export const branchSlotTemplates = pgTable(
+  "branch_slot_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    slotDurationMinutes: integer("slot_duration_minutes").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    branchActiveIdx: index("branch_slot_templates_branch_active_idx").on(table.branchId, table.active),
   })
 );

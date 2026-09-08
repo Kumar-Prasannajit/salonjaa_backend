@@ -1,4 +1,5 @@
 import { AvailabilityRepository } from "@/modules/availability/availability.repository";
+import { BranchService } from "@/modules/branch/branch.service";
 import { AvailabilityQuery, EligibleStaffDTO, SlotDTO } from "@/modules/availability/availability.types";
 import { BadRequestError, NotFoundError } from "@/shared/errors";
 import { DEFAULT_SLOT_INTERVAL_MINUTES } from "@/shared/constants";
@@ -11,7 +12,10 @@ interface CandidateWindow {
 }
 
 export class AvailabilityService {
-  constructor(private readonly repo: AvailabilityRepository = new AvailabilityRepository()) {}
+  constructor(
+    private readonly repo: AvailabilityRepository = new AvailabilityRepository(),
+    private readonly branchService: BranchService = new BranchService()
+  ) {}
 
   async getSlots(query: AvailabilityQuery): Promise<SlotDTO[]> {
     const branch = await this.repo.findBookableBranch(query.branchId);
@@ -38,7 +42,8 @@ export class AvailabilityService {
       this.repo.findBookingsInRange(query.branchId, dayStart, dayEnd),
     ]);
 
-    const candidates = this.buildCandidateWindows(dayStart, dayEnd, totalDurationMinutes);
+    const templates = await this.branchService.findActiveSlotTemplates(query.branchId);
+    const candidates = this.buildCandidateWindows(query.date, dayStart, dayEnd, totalDurationMinutes, templates);
 
     return candidates.map(({ start, end, startLabel, endLabel }) => {
       const staffOnLeave = new Set(
@@ -112,12 +117,37 @@ export class AvailabilityService {
     return new Date(`${date}T${hh}:${mm}:00`);
   }
 
-  private buildCandidateWindows(dayStart: Date, dayEnd: Date, durationMinutes: number): CandidateWindow[] {
-    const intervalMs = DEFAULT_SLOT_INTERVAL_MINUTES * 60_000;
+  /**
+   * Module 16 — wires in branch_slot_templates (previously deferred since Module 3/5: "no CRUD
+   * endpoint anywhere, so slots are generated at a fixed DEFAULT_SLOT_INTERVAL_MINUTES
+   * instead"). A branch with one or more active templates now gets its candidate windows
+   * generated per-template (each template's own startTime/endTime bounds the walk, its own
+   * slotDurationMinutes is the step between candidate starts) instead of one flat walk across
+   * the whole day at the fixed interval. A branch with zero active templates — every branch
+   * that existed before this module, and any that simply never configures one — keeps the
+   * exact original fallback behavior unchanged, so this is purely additive.
+   */
+  private buildCandidateWindows(
+    date: string,
+    dayStart: Date,
+    dayEnd: Date,
+    durationMinutes: number,
+    templates: { startTime: string; endTime: string; slotDurationMinutes: number }[]
+  ): CandidateWindow[] {
+    if (templates.length === 0) {
+      return this.walkWindow(dayStart, dayEnd, DEFAULT_SLOT_INTERVAL_MINUTES, durationMinutes);
+    }
+    return templates.flatMap((t) =>
+      this.walkWindow(this.buildDayBoundary(date, t.startTime), this.buildDayBoundary(date, t.endTime), t.slotDurationMinutes, durationMinutes)
+    );
+  }
+
+  private walkWindow(rangeStart: Date, rangeEnd: Date, intervalMinutes: number, durationMinutes: number): CandidateWindow[] {
+    const intervalMs = intervalMinutes * 60_000;
     const durationMs = durationMinutes * 60_000;
     const candidates: CandidateWindow[] = [];
 
-    for (let startMs = dayStart.getTime(); startMs + durationMs <= dayEnd.getTime(); startMs += intervalMs) {
+    for (let startMs = rangeStart.getTime(); startMs + durationMs <= rangeEnd.getTime(); startMs += intervalMs) {
       const start = new Date(startMs);
       const end = new Date(startMs + durationMs);
       candidates.push({ start, end, startLabel: this.formatTime(start), endLabel: this.formatTime(end) });

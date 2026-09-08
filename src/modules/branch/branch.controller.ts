@@ -40,4 +40,26 @@ export class BranchController {
     const rule = await branchService.setCapacityRule(req.user!.id, req.params.id, req.body.maxCapacityOverride);
     sendSuccess(res, rule);
   }
+
+  // ---- Module 16: slot templates ----
+
+  async listSlotTemplates(req: Request, res: Response): Promise<void> {
+    const rows = await branchService.listSlotTemplates(req.user!.id, req.params.id);
+    sendSuccess(res, rows);
+  }
+
+  async createSlotTemplate(req: Request, res: Response): Promise<void> {
+    const row = await branchService.createSlotTemplate(req.user!.id, req.params.id, req.body);
+    sendCreated(res, row);
+  }
+
+  async updateSlotTemplate(req: Request, res: Response): Promise<void> {
+    const row = await branchService.updateSlotTemplate(req.user!.id, req.params.id, req.params.templateId, req.body);
+    sendSuccess(res, row);
+  }
+
+  async deleteSlotTemplate(req: Request, res: Response): Promise<void> {
+    await branchService.deleteSlotTemplate(req.user!.id, req.params.id, req.params.templateId);
+    sendNoContent(res);
+  }
 }

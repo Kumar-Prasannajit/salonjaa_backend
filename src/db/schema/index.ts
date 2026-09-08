@@ -13,3 +13,4 @@ export * from "@/db/schema/review";
 export * from "@/db/schema/admin";
 export * from "@/db/schema/complaint";
 export * from "@/db/schema/strike";
+export * from "@/db/schema/promotion";

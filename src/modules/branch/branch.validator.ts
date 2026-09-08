@@ -66,3 +66,30 @@ export const createHolidaySchema = z.object({
 export const capacityRuleSchema = z.object({
   maxCapacityOverride: z.number().int().positive("maxCapacityOverride must be > 0"),
 });
+
+export const slotTemplateIdParamSchema = z.object({
+  id: z.string().uuid("Invalid branch id"),
+  templateId: z.string().uuid("Invalid slot template id"),
+});
+
+export const createSlotTemplateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    startTime: timeSchema,
+    endTime: timeSchema,
+    slotDurationMinutes: z.number().int().positive("slotDurationMinutes must be > 0"),
+  })
+  .refine((data) => data.startTime < data.endTime, { message: "startTime must be before endTime", path: ["endTime"] });
+
+export const updateSlotTemplateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    startTime: timeSchema.optional(),
+    endTime: timeSchema.optional(),
+    slotDurationMinutes: z.number().int().positive().optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((data) => !data.startTime || !data.endTime || data.startTime < data.endTime, {
+    message: "startTime must be before endTime",
+    path: ["endTime"],
+  });

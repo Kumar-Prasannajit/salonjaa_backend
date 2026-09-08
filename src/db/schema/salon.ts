@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { kycStatusEnum, salonStatusEnum, verificationStatusEnum } from "@/db/schema/enums";
 import { users } from "@/db/schema/identity";
@@ -59,5 +59,29 @@ export const salons = pgTable(
       table.deletedAt
     ),
     ownerProfileIdx: index("salons_owner_profile_id_idx").on(table.ownerProfileId),
+  })
+);
+
+// TRD §4 — deferred in Module 3 ("real future table, no documented endpoint yet"). Module 16
+// gives it a real contract, co-defined with the user: reuses the exact same "URL string,
+// frontend hosts the file elsewhere" precedent salons.logo/coverImage already established,
+// not a new image-upload mechanism.
+export const salonGalleryImages = pgTable(
+  "salon_gallery_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    salonId: uuid("salon_id")
+      .notNull()
+      .references(() => salons.id, { onDelete: "cascade" }),
+    imageUrl: text("image_url").notNull(),
+    displayOrder: integer("display_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => ({
+    // TRD: "unique (salon_id, display_order) among active images."
+    activeOrderUnique: uniqueIndex("salon_gallery_images_active_order_unique")
+      .on(table.salonId, table.displayOrder)
+      .where(sql`${table.deletedAt} is null`),
   })
 );

@@ -55,3 +55,24 @@ export interface CapacityRuleDTO {
   branchId: string;
   maxCapacityOverride: number | null;
 }
+
+export interface SlotTemplateInput {
+  name: string;
+  startTime: string;
+  endTime: string;
+  slotDurationMinutes: number;
+}
+
+export interface UpdateSlotTemplateInput extends Partial<SlotTemplateInput> {
+  active?: boolean;
+}
+
+export interface SlotTemplateDTO {
+  id: string;
+  branchId: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  slotDurationMinutes: number;
+  active: boolean;
+}

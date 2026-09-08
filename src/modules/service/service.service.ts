@@ -69,7 +69,9 @@ export class ServiceService {
     await this.repo.removeAssignment(staffId, serviceId);
   }
 
-  private async assertOwned(userId: string, serviceId: string) {
+  /** Made public (Module 16) so Promotion can verify a target serviceId belongs to the
+   * caller — same precedent as BranchService.assertOwned being made public for Staff/Service. */
+  async assertOwned(userId: string, serviceId: string) {
     const row = await this.repo.findById(serviceId);
     if (!row) {
       throw new NotFoundError("Service not found");
