@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
-import { branchStatusEnum } from "@/db/schema/enums";
+import { branchStatusEnum, genderServedEnum } from "@/db/schema/enums";
 import { salons } from "@/db/schema/salon";
 import { users } from "@/db/schema/identity";
 
@@ -37,6 +37,10 @@ export const branches = pgTable(
     openingTime: time("opening_time").notNull(),
     closingTime: time("closing_time").notNull(),
     status: branchStatusEnum("status").notNull().default("ACTIVE"),
+    // Module 21 — closes docs/COMPETITOR_COMPARISON_LUZO.md's "Unisex/Men tags absent" gap.
+    // Owner-set, branch-level. Defaults UNISEX for every branch that existed before this
+    // column and any that doesn't set it explicitly — the least presumptive default.
+    genderServed: genderServedEnum("gender_served").notNull().default("UNISEX"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

@@ -120,4 +120,26 @@ export class PublicBranchRepository {
     }
     return map;
   }
+
+  /**
+   * Module 21 — bulk average active-service basePrice per branch, the raw signal
+   * PublicBranchService buckets into a ₹/₹₹/₹₹₹ tier. Same live-computed, no-cache precedent
+   * as getRatingAggregates above. A branch with zero active services (shouldn't normally
+   * happen for a bookable one, but not impossible) is simply absent from the returned map.
+   */
+  async getAveragePrices(branchIds: string[]): Promise<Map<string, number>> {
+    if (branchIds.length === 0) return new Map();
+    const rows = await db
+      .select({
+        branchId: branchServices.branchId,
+        average: sql<number>`avg(${branchServices.basePrice})`.mapWith(Number),
+      })
+      .from(branchServices)
+      .where(and(inArray(branchServices.branchId, branchIds), eq(branchServices.status, "ACTIVE"), isNull(branchServices.deletedAt)))
+      .groupBy(branchServices.branchId);
+
+    const map = new Map<string, number>();
+    for (const r of rows) map.set(r.branchId, r.average);
+    return map;
+  }
 }

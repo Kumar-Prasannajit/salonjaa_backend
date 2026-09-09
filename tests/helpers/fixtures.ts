@@ -14,7 +14,14 @@ import { ROLE_NAMES } from "@/shared/constants";
  * it's simply faster test setup, the Admin endpoint exists and is tested on its own.
  */
 export async function createBookableBranch(
-  overrides: { totalChairs?: number; openingTime?: string; closingTime?: string; basePrice?: number; durationMinutes?: number } = {}
+  overrides: {
+    totalChairs?: number;
+    openingTime?: string;
+    closingTime?: string;
+    basePrice?: number;
+    durationMinutes?: number;
+    genderServed?: "UNISEX" | "MEN" | "WOMEN";
+  } = {}
 ) {
   const owner = await createTestUser([ROLE_NAMES.CUSTOMER, ROLE_NAMES.SALON_OWNER]);
 
@@ -37,6 +44,7 @@ export async function createBookableBranch(
       openingTime: overrides.openingTime ?? "09:00",
       closingTime: overrides.closingTime ?? "18:00",
       status: "ACTIVE",
+      genderServed: overrides.genderServed ?? "UNISEX",
     })
     .returning();
   const [category] = await db.insert(serviceCategories).values({ name: "Test Category", slug: `test-category-${branch.id}` }).returning();

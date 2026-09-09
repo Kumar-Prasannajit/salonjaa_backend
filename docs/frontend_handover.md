@@ -262,6 +262,14 @@ Purpose: a stored-balance wallet, funded only by admin-approved refunds and Modu
 - A WALLET-paid booking that is later cancelled, rejected, or expires unconfirmed refunds the full spend back to the wallet automatically — no customer action needed.
 - `POST /admin/refunds/:id/approve` now credits the wallet with the refund amount (previously just marked the decision with no money movement) — notification event `REFUND_APPROVED` fires as before.
 
+## Listing card signals: price tier, gender-served tags, offer banners — 🟢 Live (Module 21, `docs/NEXT_SESSION_PLAN.md` items 2 + 3)
+
+- `GET /public/branches` and `GET /public/branches/:branchId` responses gain three fields:
+  - `priceTier: "₹" | "₹₹" | "₹₹₹" | null` — computed server-side from the branch's average active-service price, no owner input. `null` only if the branch somehow has zero active services.
+  - `genderServed: "UNISEX" | "MEN" | "WOMEN"` — owner-set per branch (defaults `UNISEX`). Settable via the existing `POST /branches`/`PATCH /branches/:id` body's new optional `genderServed` field — no new endpoint.
+  - `activePromotion: { title, bannerImageUrl } | null` — **listing card only** (not on the detail response, which already has the full list via `GET /public/promotions?branchId=`). Only shows when the owner has explicitly flagged one of the branch's active, in-range promotions as `featured` — a branch with active promotions but none flagged featured shows `null`, not an automatic pick.
+- `POST /promotions`/`PATCH /promotions/:id` (owner) gain an optional `featured: boolean` field (default false) — surfaced back in the promotion object too.
+
 ## ⚪ Not built yet — pending a decision, don't build frontend against these
 
-`docs/NEXT_SESSION_PLAN.md` (backend repo) lists the remaining items identified from a competitor comparison: service variants/customisation, price-tier + gender-served tags on listing cards, offer banners on listing cards, and a "pay for a walk-in with no prior booking" flow (the general customer wallet, previously listed here, is now `🟢 Live` above). **None of the remaining ones have a contract yet** — each has open product/schema questions that need answering with the client before any endpoint exists. Don't start frontend work against guessed shapes for these; check back once `docs/NEXT_SESSION_PLAN.md`'s items move to their own `🟢 Live` sections above.
+`docs/NEXT_SESSION_PLAN.md` (backend repo) lists the remaining items identified from a competitor comparison: service variants/customisation, and a "pay for a walk-in with no prior booking" flow (the general customer wallet and the listing-card signals above, previously listed here, are now `🟢 Live`). **Neither remaining item has a contract yet** — each has open product/schema questions that need answering with the client before any endpoint exists. Don't start frontend work against guessed shapes for these; check back once `docs/NEXT_SESSION_PLAN.md`'s items move to their own `🟢 Live` sections above.

@@ -1,13 +1,25 @@
 import { PublicBranchRepository } from "@/modules/browse/public-branch.repository";
+import { PromotionRepository } from "@/modules/promotion/promotion.repository";
 import { SalonService } from "@/modules/salon/salon.service";
 import { BranchSearchQuery, PublicBranchDetailDTO, PublicBranchListItemDTO } from "@/modules/browse/public-branch.types";
 import { NotFoundError } from "@/shared/errors";
 import { haversineKm } from "@/shared/geo";
+import { PRICE_TIER_LOW_MAX, PRICE_TIER_MID_MAX } from "@/shared/constants";
+
+/** Module 21 — buckets an average active-service price into a ₹/₹₹/₹₹₹ tier. Cutoffs
+ * confirmed with the user: < ₹300 is ₹, ₹300–800 is ₹₹, > ₹800 is ₹₹₹. */
+function computePriceTier(averagePrice: number | undefined): "₹" | "₹₹" | "₹₹₹" | null {
+  if (averagePrice === undefined) return null;
+  if (averagePrice < PRICE_TIER_LOW_MAX) return "₹";
+  if (averagePrice <= PRICE_TIER_MID_MAX) return "₹₹";
+  return "₹₹₹";
+}
 
 export class PublicBranchService {
   constructor(
     private readonly repo: PublicBranchRepository = new PublicBranchRepository(),
-    private readonly salonService: SalonService = new SalonService()
+    private readonly salonService: SalonService = new SalonService(),
+    private readonly promotionRepo: PromotionRepository = new PromotionRepository()
   ) {}
 
   async search(query: BranchSearchQuery): Promise<PublicBranchListItemDTO[]> {
@@ -17,7 +29,12 @@ export class PublicBranchService {
       serviceCategoryId: query.serviceCategoryId,
       salonId: query.salonId,
     });
-    const ratings = await this.repo.getRatingAggregates(rows.map((r) => r.branch.id));
+    const branchIds = rows.map((r) => r.branch.id);
+    const [ratings, averagePrices, featuredPromotions] = await Promise.all([
+      this.repo.getRatingAggregates(branchIds),
+      this.repo.getAveragePrices(branchIds),
+      this.promotionRepo.findFeaturedActiveByBranchIds(branchIds),
+    ]);
 
     let items: PublicBranchListItemDTO[] = rows.map(({ branch, salon }) => {
       const rating = ratings.get(branch.id);
@@ -36,6 +53,9 @@ export class PublicBranchService {
         distanceKm,
         averageRating: rating?.average ?? null,
         reviewCount: rating?.count ?? 0,
+        priceTier: computePriceTier(averagePrices.get(branch.id)),
+        genderServed: branch.genderServed,
+        activePromotion: featuredPromotions.get(branch.id) ?? null,
       };
     });
 
@@ -64,10 +84,11 @@ export class PublicBranchService {
     }
     const { branch, salon } = row;
 
-    const [services, ratings, gallery] = await Promise.all([
+    const [services, ratings, gallery, averagePrices] = await Promise.all([
       this.repo.findActiveServicesWithCategory(branchId),
       this.repo.getRatingAggregates([branchId]),
       this.salonService.listGallery(salon.id),
+      this.repo.getAveragePrices([branchId]),
     ]);
     const rating = ratings.get(branchId);
 
@@ -91,6 +112,8 @@ export class PublicBranchService {
       openingTime: branch.openingTime,
       closingTime: branch.closingTime,
       services,
+      priceTier: computePriceTier(averagePrices.get(branchId)),
+      genderServed: branch.genderServed,
     };
   }
 }

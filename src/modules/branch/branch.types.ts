@@ -13,6 +13,8 @@ export interface CreateBranchInput {
   totalChairs: number;
   openingTime: string;
   closingTime: string;
+  // Module 21 — optional, defaults to UNISEX at the DB level when omitted.
+  genderServed?: "UNISEX" | "MEN" | "WOMEN";
 }
 
 export type UpdateBranchInput = Partial<Omit<CreateBranchInput, "salonId">>;
@@ -34,6 +36,7 @@ export interface BranchDTO {
   openingTime: string;
   closingTime: string;
   status: string;
+  genderServed: string;
 }
 
 export interface CreateHolidayInput {

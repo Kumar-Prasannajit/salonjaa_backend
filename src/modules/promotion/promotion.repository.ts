@@ -10,6 +10,7 @@ export class PromotionRepository {
     bannerImageUrl?: string;
     startsAt: Date;
     endsAt: Date;
+    featured?: boolean;
   }) {
     const [row] = await db.insert(promotions).values(params).returning();
     return row;
@@ -89,5 +90,47 @@ export class PromotionRepository {
    * before acting, same safe-no-op pattern as every other delayed job in this codebase. */
   async deactivate(id: string): Promise<void> {
     await db.update(promotions).set({ active: false }).where(eq(promotions.id, id));
+  }
+
+  /**
+   * Module 22 — bulk lookup for PublicBranchService's listing card banner, same "one query for
+   * every branch, avoid N+1" precedent as getRatingAggregates (Module 10). Only a `featured`,
+   * currently-active, in-range promotion is ever a candidate; a branch with several featured
+   * promotions at once picks its most-recently-created one (deterministic tie-break, since the
+   * user's answer only specified "owner-flagged featured" as the primary rule, not what to do
+   * with more than one at a time).
+   */
+  async findFeaturedActiveByBranchIds(branchIds: string[]): Promise<Map<string, { title: string; bannerImageUrl: string | null }>> {
+    if (branchIds.length === 0) return new Map();
+    const now = new Date();
+    const rows = await db
+      .select({
+        branchId: promotionBranches.branchId,
+        title: promotions.title,
+        bannerImageUrl: promotions.bannerImageUrl,
+        createdAt: promotions.createdAt,
+      })
+      .from(promotionBranches)
+      .innerJoin(promotions, eq(promotionBranches.promotionId, promotions.id))
+      .where(
+        and(
+          inArray(promotionBranches.branchId, branchIds),
+          eq(promotions.featured, true),
+          eq(promotions.active, true),
+          isNull(promotions.deletedAt),
+          lte(promotions.startsAt, now),
+          gte(promotions.endsAt, now)
+        )
+      )
+      .orderBy(desc(promotions.createdAt));
+
+    // Rows arrive newest-first; the first one seen per branchId is the one kept.
+    const map = new Map<string, { title: string; bannerImageUrl: string | null }>();
+    for (const r of rows) {
+      if (!map.has(r.branchId)) {
+        map.set(r.branchId, { title: r.title, bannerImageUrl: r.bannerImageUrl });
+      }
+    }
+    return map;
   }
 }

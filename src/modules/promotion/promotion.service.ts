@@ -38,6 +38,7 @@ export class PromotionService {
       bannerImageUrl: input.bannerImageUrl,
       startsAt: new Date(input.startsAt),
       endsAt: new Date(input.endsAt),
+      featured: input.featured,
     });
     await this.repo.linkBranches(row.id, input.branchIds);
     if (input.serviceIds?.length) {
@@ -95,6 +96,7 @@ export class PromotionService {
       startsAt: row.startsAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
       active: row.active,
+      featured: row.featured,
       branchIds,
       serviceIds,
       createdAt: row.createdAt.toISOString(),

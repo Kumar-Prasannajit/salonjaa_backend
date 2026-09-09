@@ -49,3 +49,10 @@ export const ADVANCE_PAYMENT_PERCENT = 0.1;
 // customer during the payment window, same as it did while the status was APPROVED before
 // this module existed.
 export const CAPACITY_CONSUMING_BOOKING_STATUSES = ["PENDING", "APPROVED", "AWAITING_PAYMENT"] as const;
+
+// Module 21 — docs/NEXT_SESSION_PLAN.md item 2. Buckets a branch's average active-service
+// basePrice into a ₹/₹₹/₹₹₹ tier for listing cards, computed at read time (no schema change,
+// same "compute on every request, no cache" precedent as rating aggregates). Cutoffs
+// confirmed with the user rather than invented: < ₹300 is ₹, ₹300–800 is ₹₹, > ₹800 is ₹₹₹.
+export const PRICE_TIER_LOW_MAX = 300;
+export const PRICE_TIER_MID_MAX = 800;

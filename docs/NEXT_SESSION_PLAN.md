@@ -15,7 +15,10 @@ Priority order below is a suggestion, not a mandate — ask which the user wants
 
 **Likely shape once decided:** new `service_variants` table (`id`, `branchServiceId`, `name`, `price`, maybe `durationMinutes` override, `active`, soft-delete) + `branch_services` gains `hasVariants`/`variantRequired` boolean, or variants' mere existence implies required-selection. `booking_services` gains nullable variant snapshot columns. Owner-facing CRUD under `POST/GET /services/:id/variants` (matches the existing `staff`/`services` assignment-endpoint pattern). `POST /bookings`'s `services` array entries need a way to carry `{serviceId, variantId?}` instead of a bare ID — this is the one part of the *existing* contract that would change shape, flag it clearly to the frontend before building.
 
-## 2. Price tier + gender-served tags on listing cards
+## 2. Price tier + gender-served tags on listing cards — ✅ Done (Module 21)
+
+Built per the decisions below (computed price tier, branch-level gender-served). See `docs/PROGRESS.md`'s Module 21 entry and `docs/frontend_handover.md`'s listing-card-signals section for the shipped contract.
+
 
 **Why:** LUZO's cards show ₹/₹₹/₹₹₹ and Unisex/Men at a glance — cheap signal for shortlisting, currently absent from `PublicBranchListItemDTO`.
 
@@ -25,7 +28,10 @@ Priority order below is a suggestion, not a mandate — ask which the user wants
 
 **Likely shape once decided:** if owner-set, a column on `salons` or `branches` (decide which) + surfaced on `PublicBranchListItemDTO`/`PublicBranchDetailDTO`. If price tier is computed, it's a pure read-time bucketing in `PublicBranchRepository`/`PublicBranchService`, no schema change at all — genuinely cheap once the bucket thresholds are decided (ask for real ₹ cutoffs, don't invent them).
 
-## 3. Offer banners on listing cards
+## 3. Offer banners on listing cards — ✅ Done (Module 21)
+
+Built per the owner-flagged-`featured` tie-break decided with the user. See `docs/PROGRESS.md`'s Module 21 entry and `docs/frontend_handover.md`'s listing-card-signals section for the shipped contract.
+
 
 **Why:** LUZO shows "Get 40% OFF via LUZO" right on the card. Module 17's promotions (`GET /public/promotions?branchId=`) already exist as a separate list — nothing surfaces the most relevant one *on* the branch card itself today.
 

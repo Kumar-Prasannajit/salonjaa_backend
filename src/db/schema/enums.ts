@@ -14,6 +14,11 @@ export const staffTypeEnum = pgEnum("staff_type", ["NORMAL", "STAR"]);
 export const staffStatusEnum = pgEnum("staff_status", ["ACTIVE", "INACTIVE"]);
 export const leaveStatusEnum = pgEnum("leave_status", ["APPROVED", "CANCELLED"]);
 export const serviceStatusEnum = pgEnum("service_status", ["ACTIVE", "INACTIVE"]);
+// Module 21 — docs/NEXT_SESSION_PLAN.md item 2 (LUZO comparison: Unisex/Men tags on listing
+// cards). Owner-set, branch-level (decided with the user — a multi-branch brand can have
+// different-audience locations). No "WOMEN" precedent existed anywhere in the docs before
+// this; added for symmetry with MEN, same three-value shape LUZO itself shows.
+export const genderServedEnum = pgEnum("gender_served", ["UNISEX", "MEN", "WOMEN"]);
 
 // Booking
 export const bookingTypeEnum = pgEnum("booking_type", ["ONLINE", "WALK_IN"]);

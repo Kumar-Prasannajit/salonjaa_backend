@@ -6,6 +6,9 @@ export interface CreatePromotionInput {
   endsAt: string;
   branchIds: string[];
   serviceIds?: string[];
+  // Module 22 — docs/NEXT_SESSION_PLAN.md item 3, see src/db/schema/promotion.ts's comment.
+  // Defaults false.
+  featured?: boolean;
 }
 
 export interface UpdatePromotionInput {
@@ -15,6 +18,7 @@ export interface UpdatePromotionInput {
   startsAt?: string;
   endsAt?: string;
   active?: boolean;
+  featured?: boolean;
 }
 
 export interface PromotionDTO {
@@ -26,6 +30,7 @@ export interface PromotionDTO {
   startsAt: string;
   endsAt: string;
   active: boolean;
+  featured: boolean;
   branchIds: string[];
   serviceIds: string[];
   createdAt: string;

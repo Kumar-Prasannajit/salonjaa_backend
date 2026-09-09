@@ -60,6 +60,7 @@ export class BranchRepository {
         totalChairs: input.totalChairs,
         openingTime: input.openingTime,
         closingTime: input.closingTime,
+        genderServed: input.genderServed,
       })
       .returning();
     return branch;

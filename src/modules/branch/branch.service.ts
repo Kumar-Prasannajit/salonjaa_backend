@@ -175,6 +175,7 @@ export class BranchService {
     openingTime: string;
     closingTime: string;
     status: string;
+    genderServed: string;
   }): BranchDTO {
     return {
       id: branch.id,
@@ -193,6 +194,7 @@ export class BranchService {
       openingTime: branch.openingTime,
       closingTime: branch.closingTime,
       status: branch.status,
+      genderServed: branch.genderServed,
     };
   }
 }

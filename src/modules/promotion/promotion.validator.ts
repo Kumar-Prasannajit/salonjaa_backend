@@ -13,6 +13,7 @@ export const createPromotionSchema = z
     endsAt: z.string().datetime(),
     branchIds: z.array(z.string().uuid("Invalid branch id")).min(1, "At least one branchId is required"),
     serviceIds: z.array(z.string().uuid("Invalid service id")).optional(),
+    featured: z.boolean().optional(),
   })
   .refine((v) => new Date(v.startsAt) < new Date(v.endsAt), { message: "startsAt must be before endsAt", path: ["endsAt"] });
 
@@ -24,6 +25,7 @@ export const updatePromotionSchema = z
     startsAt: z.string().datetime().optional(),
     endsAt: z.string().datetime().optional(),
     active: z.boolean().optional(),
+    featured: z.boolean().optional(),
   })
   .refine((v) => !v.startsAt || !v.endsAt || new Date(v.startsAt) < new Date(v.endsAt), {
     message: "startsAt must be before endsAt",

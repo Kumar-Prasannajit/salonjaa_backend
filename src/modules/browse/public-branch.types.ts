@@ -26,6 +26,15 @@ export interface PublicBranchListItemDTO {
   distanceKm: number | null;
   averageRating: number | null;
   reviewCount: number;
+  // Module 21 — docs/NEXT_SESSION_PLAN.md item 2. null when the branch has no active services
+  // to average (nothing to bucket). genderServed always has a value (DB default UNISEX).
+  priceTier: "₹" | "₹₹" | "₹₹₹" | null;
+  genderServed: string;
+  // Module 22 — docs/NEXT_SESSION_PLAN.md item 3. Only a currently-active, in-range,
+  // owner-`featured` promotion targeting this branch is ever surfaced here; null otherwise
+  // (a branch with active-but-not-featured promotions still shows no banner — see
+  // PromotionRepository.findFeaturedActiveByBranchIds).
+  activePromotion: { title: string; bannerImageUrl: string | null } | null;
 }
 
 export interface PublicBranchServiceDTO {
@@ -60,4 +69,7 @@ export interface PublicBranchDetailDTO {
   openingTime: string;
   closingTime: string;
   services: PublicBranchServiceDTO[];
+  // Module 21 — same fields/semantics as the listing card (PublicBranchListItemDTO above).
+  priceTier: "₹" | "₹₹" | "₹₹₹" | null;
+  genderServed: string;
 }

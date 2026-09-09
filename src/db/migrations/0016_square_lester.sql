@@ -1,0 +1,2 @@
+ALTER TABLE "promotions" ADD COLUMN "featured" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "promotions_featured_active_idx" ON "promotions" USING btree ("featured","active");

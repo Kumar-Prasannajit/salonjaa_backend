@@ -21,11 +21,19 @@ export const promotions = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     active: boolean("active").notNull().default(true),
+    // Module 22 — docs/NEXT_SESSION_PLAN.md item 3. Owner-flagged, decided with the user as
+    // the tie-break when a branch has multiple active promotions: only a `featured` one is
+    // ever surfaced as the listing-card banner (PublicBranchListItemDTO.activePromotion) — a
+    // branch with none flagged shows no banner, it isn't picked automatically by recency/end
+    // date. Independent of `active` (a promotion can be featured but inactive/out-of-range,
+    // simply not currently eligible to show).
+    featured: boolean("featured").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => ({
     activeRangeIdx: index("promotions_active_range_idx").on(table.active, table.startsAt, table.endsAt),
+    featuredActiveIdx: index("promotions_featured_active_idx").on(table.featured, table.active),
   })
 );
 
