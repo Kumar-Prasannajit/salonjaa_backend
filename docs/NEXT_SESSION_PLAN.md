@@ -33,7 +33,9 @@ Priority order below is a suggestion, not a mandate — ask which the user wants
 
 **Likely shape once decided:** this one might not even need a schema change — `PublicBranchListItemDTO` gains an optional `activePromotion: {title, bannerImageUrl} | null`, computed via the same query `getRatingAggregates` already does in bulk for the branch list (avoid N+1). **Probably the cheapest of the five "hard" items** — consider doing this one first once the tie-break question is answered.
 
-## 4. General customer wallet
+## 4. General customer wallet — ✅ Done (Module 20)
+
+Built per the "Recommendation for scoping this down" below, confirmed with the user rather than assumed. See `docs/PROGRESS.md`'s Module 20 entry and `docs/frontend_handover.md`'s wallet section for the shipped contract. Left in place below for the record of the original open questions and how each was resolved.
 
 **Why:** LUZO's account area has a stored-balance wallet; Salonjaa has only the narrow, single-purpose forfeiture-coupon mechanism from Module 16, and refund "approval" today only marks a decision — no money or credit actually moves anywhere (`docs/PROGRESS.md`'s Module 9b note: "no automated eligibility logic... no gateway wired for issuing funds").
 

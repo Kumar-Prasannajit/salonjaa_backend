@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { app } from "./helpers/app";
@@ -6,7 +6,7 @@ import { resetDb } from "./helpers/db";
 import { authHeader, createTestUser } from "./helpers/auth";
 import { createBookableBranch, tomorrowDateString } from "./helpers/fixtures";
 import { db } from "@/config/database";
-import { bookings, coupons } from "@/db/schema";
+import { bookings, wallets, walletTransactions } from "@/db/schema";
 import { ROLE_NAMES } from "@/shared/constants";
 
 /** Creates + approves a PAY_AT_SALON booking, then pushes it into the past directly in the DB
@@ -131,17 +131,20 @@ describe("Module 16 — customer strikes / advance payment / NO_SHOW", () => {
     expect(approveRes.status).toBe(200);
     expect(approveRes.body.data.bookingStatus).toBe("APPROVED");
 
-    // Cancelling it (outside the 2h cutoff) forfeits the advance and issues a coupon instead
-    // of a refund.
+    // Cancelling it (outside the 2h cutoff) forfeits the advance to the customer's wallet
+    // instead of refunding it (Module 20 — replaces Module 16's original forfeiture-coupon
+    // mechanism).
     const cancelRes = await request(app).post(`/api/v1/bookings/${bookingId}/cancel`).set(authHeader(customer.accessToken)).send({});
     expect(cancelRes.status).toBe(200);
 
-    const [issuedCoupon] = await db
-      .select()
-      .from(coupons)
-      .where(and(eq(coupons.restrictedToCustomerId, customer.id), eq(coupons.value, 20)));
-    expect(issuedCoupon).toBeTruthy();
-    expect(issuedCoupon.type).toBe("FIXED");
+    const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, customer.id));
+    expect(wallet).toBeTruthy();
+    expect(wallet.balance).toBeCloseTo(20, 5);
+
+    const [txn] = await db.select().from(walletTransactions).where(eq(walletTransactions.walletId, wallet.id));
+    expect(txn.type).toBe("CREDIT");
+    expect(txn.reason).toBe("ADVANCE_FORFEITURE");
+    expect(txn.amount).toBeCloseTo(20, 5);
   });
 
   it("choosing ONLINE payment skips the advance-payment requirement even when restricted (full payment already covers it)", async () => {

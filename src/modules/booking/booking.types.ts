@@ -12,8 +12,10 @@ export interface CreateBookingInput {
   // rather than silently creating an undiscounted booking.
   couponCode?: string;
   // Module 14b — see PROGRESS.md's Module 14b entry. Defaults to ONLINE (the only path that
-  // existed before this module) when omitted.
-  paymentMethod?: "ONLINE" | "PAY_AT_SALON";
+  // existed before this module) when omitted. Module 20 adds WALLET — spends the customer's
+  // wallet balance in full at creation time (422 if insufficient, no booking created); never
+  // needs the strikes-policy advance deposit, same reasoning as ONLINE (see BookingService.create).
+  paymentMethod?: "ONLINE" | "PAY_AT_SALON" | "WALLET";
 }
 
 export interface CancelBookingInput {

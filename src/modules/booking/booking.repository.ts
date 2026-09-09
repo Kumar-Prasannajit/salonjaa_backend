@@ -12,9 +12,11 @@ import {
   salons,
   branches,
   staff,
+  wallets,
+  walletTransactions,
 } from "@/db/schema";
 import { CAPACITY_CONSUMING_BOOKING_STATUSES } from "@/shared/constants";
-import { ConflictError } from "@/shared/errors";
+import { ConflictError, UnprocessableEntityError } from "@/shared/errors";
 import { BookingNames, BookingServiceLine } from "@/modules/booking/booking.types";
 
 interface AppliedCoupon {
@@ -33,8 +35,8 @@ interface CreateBookingParams {
   branchId: string;
   bookingType: "ONLINE" | "WALK_IN";
   bookingStatus: "PENDING" | "APPROVED";
-  // Module 14b — see PROGRESS.md's Module 14b entry.
-  paymentMethod: "ONLINE" | "PAY_AT_SALON";
+  // Module 14b — see PROGRESS.md's Module 14b entry. Module 20 adds WALLET.
+  paymentMethod: "ONLINE" | "PAY_AT_SALON" | "WALLET";
   selectedStaffId: string | null;
   scheduledStart: Date;
   scheduledEnd: Date;
@@ -210,6 +212,37 @@ export class BookingRepository {
         })
         .returning();
 
+      // Module 20 — a customer paying by wallet is debited immediately, inside this same
+      // transaction, so a failure anywhere else in booking creation rolls the debit back too.
+      // Deliberately NOT delegated to WalletRepository.debit (which opens its own transaction —
+      // see WalletService's note): inlined here directly, same "own repository, don't share a
+      // transaction across module boundaries" precedent as the coupon writes just below. An
+      // insufficient balance throws 422 here and unwinds the whole transaction, so no booking
+      // is ever created against a wallet spend that didn't actually happen — same "don't
+      // silently create an undiscounted/unpaid booking" philosophy as the coupon check.
+      if (params.paymentMethod === "WALLET") {
+        // Only ever reached via the authenticated customer flow (POST /bookings) — walk-ins
+        // always hardcode PAY_AT_SALON — so customerId is always present here.
+        const customerId = params.customerId as string;
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${customerId}))`);
+        const [existingWallet] = await tx.select().from(wallets).where(eq(wallets.userId, customerId)).limit(1);
+        const wallet = existingWallet ?? (await tx.insert(wallets).values({ userId: customerId, balance: 0 }).returning())[0];
+        if (wallet.balance < totalAmount) {
+          throw new UnprocessableEntityError("Insufficient wallet balance");
+        }
+        const balanceAfter = wallet.balance - totalAmount;
+        await tx.update(wallets).set({ balance: balanceAfter, updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
+        await tx.insert(walletTransactions).values({
+          walletId: wallet.id,
+          type: "DEBIT",
+          amount: totalAmount,
+          balanceAfter,
+          reason: "BOOKING_PAYMENT",
+          referenceId: booking.id,
+          description: `Booking ${booking.bookingNumber}`,
+        });
+      }
+
       if (params.services.length > 0) {
         await tx.insert(bookingServices).values(
           params.services.map((s) => ({
@@ -340,22 +373,5 @@ export class BookingRepository {
       .where(and(eq(payments.bookingId, bookingId), eq(payments.purpose, "ADVANCE"), eq(payments.status, "SUCCESS")))
       .limit(1);
     return row ?? null;
-  }
-
-  /** Forfeiture coupon issued when a restricted customer cancels a booking they already paid
-   * an advance on — restrictedToCustomerId keeps it unusable by anyone else. */
-  async createForfeitureCoupon(params: { couponCode: string; customerId: string; amount: number }) {
-    const [row] = await db
-      .insert(coupons)
-      .values({
-        couponCode: params.couponCode,
-        type: "FIXED",
-        value: params.amount,
-        restrictedToCustomerId: params.customerId,
-        usageLimit: 1,
-        active: true,
-      })
-      .returning();
-    return row;
   }
 }

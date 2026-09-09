@@ -34,7 +34,10 @@ export type NotificationEventType =
   // Module 16 — customer strikes / advance payment / NO_SHOW.
   | "BOOKING_NO_SHOW"
   | "ADVANCE_PAYMENT_RECEIVED"
-  | "ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED";
+  // Module 20 — wallet. Replaces ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED (Module 16's original
+  // forfeiture-coupon mechanism, since replaced by a wallet credit — see WalletService).
+  | "ADVANCE_PAYMENT_FORFEITED_TO_WALLET"
+  | "BOOKING_PAYMENT_REFUNDED_TO_WALLET";
 
 export interface NotifyInput {
   userId: string;

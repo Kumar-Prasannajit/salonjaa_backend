@@ -11,8 +11,10 @@ export interface CouponLike {
   usedCount: number;
   startsAt: Date | null;
   expiresAt: Date | null;
-  // Module 16 — set only on a forfeited-advance-payment coupon (see
-  // BookingService.issueForfeitureCoupon). null for every ordinary platform-wide coupon.
+  // Module 16 — set only on an admin-issued customer-restricted coupon (this mechanism was the
+  // original home of the advance-payment forfeiture case, since replaced by a wallet credit in
+  // Module 20 — see WalletService.creditForfeiture). null for every ordinary platform-wide
+  // coupon.
   restrictedToCustomerId?: string | null;
 }
 

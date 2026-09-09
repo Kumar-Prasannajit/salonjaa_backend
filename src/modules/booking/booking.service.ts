@@ -5,6 +5,7 @@ import { BranchService } from "@/modules/branch/branch.service";
 import { StaffService } from "@/modules/staff/staff.service";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { StrikeService } from "@/modules/strike/strike.service";
+import { WalletService } from "@/modules/wallet/wallet.service";
 import {
   ApproveBookingInput,
   BookingDTO,
@@ -19,7 +20,7 @@ import {
 } from "@/modules/booking/booking.types";
 import { BadRequestError, ConflictError, NotFoundError, UnprocessableEntityError } from "@/shared/errors";
 import { assertCouponEligible, computeCouponDiscount } from "@/shared/coupon";
-import { generateBookingNumber, generateCouponCode } from "@/shared/crypto";
+import { generateBookingNumber } from "@/shared/crypto";
 import { CANCELLATION_CUTOFF_HOURS, CAPACITY_CONSUMING_BOOKING_STATUSES, ROLE_NAMES } from "@/shared/constants";
 import { env } from "@/config/env";
 import { scheduleBookingExpiry } from "@/queues/booking-expiry.queue";
@@ -38,7 +39,8 @@ export class BookingService {
     private readonly branchService: BranchService = new BranchService(),
     private readonly staffService: StaffService = new StaffService(),
     private readonly notificationService: NotificationService = new NotificationService(),
-    private readonly strikeService: StrikeService = new StrikeService()
+    private readonly strikeService: StrikeService = new StrikeService(),
+    private readonly walletService: WalletService = new WalletService()
   ) {}
 
   async create(userId: string, input: CreateBookingInput): Promise<{ bookingId: string; status: string }> {
@@ -168,7 +170,10 @@ export class BookingService {
    * blocked entirely (decided with the user — no "late cancel with strike" path).
    *
    * If this booking had a paid advance deposit (Module 16 strikes policy), that deposit is
-   * forfeited rather than refunded — see issueForfeitureCoupon.
+   * forfeited rather than refunded — see forfeitAdvanceToWallet. If it was paid in full by
+   * wallet (Module 20), that spend IS refunded back in full — see refundWalletPaymentIfAny —
+   * these are two different money layers and don't conflict (a WALLET-paid booking never has
+   * requiresAdvancePayment set — see create()).
    */
   async cancel(userId: string, bookingId: string, input: CancelBookingInput): Promise<BookingDTO> {
     const { reasonCode, reason } = input;
@@ -193,8 +198,9 @@ export class BookingService {
     );
 
     if (booking.requiresAdvancePayment) {
-      await this.issueForfeitureCoupon(booking);
+      await this.forfeitAdvanceToWallet(booking);
     }
+    await this.refundWalletPaymentIfAny(booking);
 
     const ownerUserId = await this.salonService.findOwnerUserId(booking.salonId);
     if (ownerUserId) {
@@ -392,6 +398,7 @@ export class BookingService {
       userId,
       reason
     );
+    await this.refundWalletPaymentIfAny(booking);
 
     if (booking.customerId) {
       await this.notificationService.notify({
@@ -540,27 +547,38 @@ export class BookingService {
 
   /**
    * Module 16 — the advance deposit on a strikes-restricted booking is non-refundable on
-   * cancellation (decided with the user), but rather than the customer simply losing it, it's
-   * converted into a single-use, customer-restricted coupon for the same amount — usable
-   * toward a future booking's total (which, since a future advance is 10% of that booking's
-   * total, naturally lowers the next advance too). Reuses the existing coupon machinery
-   * end-to-end rather than inventing a separate "advance credit" ledger.
+   * cancellation (decided with the user). Module 20 replaces the original coupon-based
+   * mechanism (a single-use, customer-restricted coupon minted for the forfeited amount) with a
+   * direct wallet credit — same underlying policy ("forfeited, not refunded, but not simply
+   * lost either"), simpler delivery: one general-purpose balance instead of a one-off coupon.
    */
-  private async issueForfeitureCoupon(booking: BookingRow): Promise<void> {
+  private async forfeitAdvanceToWallet(booking: BookingRow): Promise<void> {
     if (!booking.customerId || !booking.advanceAmount) return;
     const advancePayment = await this.repo.findSuccessfulAdvancePayment(booking.id);
     if (!advancePayment) return; // Advance was never actually paid — nothing to forfeit.
 
-    const couponCode = generateCouponCode();
-    await this.repo.createForfeitureCoupon({
-      couponCode,
-      customerId: booking.customerId,
-      amount: advancePayment.amount,
-    });
+    await this.walletService.creditForfeiture(booking.customerId, advancePayment.amount, booking.id, booking.bookingNumber);
     await this.notificationService.notify({
       userId: booking.customerId,
-      eventType: "ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED",
-      data: { bookingNumber: booking.bookingNumber, couponCode, amount: String(advancePayment.amount) },
+      eventType: "ADVANCE_PAYMENT_FORFEITED_TO_WALLET",
+      data: { bookingNumber: booking.bookingNumber, amount: String(advancePayment.amount) },
+    });
+  }
+
+  /**
+   * Module 20 — a booking paid in full by wallet (paymentMethod: "WALLET") that ends up
+   * cancelled or rejected gets that spend refunded back in full (decided with the user) — a
+   * plain ledger credit, no gateway involved, unlike ONLINE's payment-refund story which still
+   * has no automated path. A booking that expires unconfirmed (booking.expire worker) gets the
+   * same treatment — see booking-expiry.worker.ts.
+   */
+  private async refundWalletPaymentIfAny(booking: BookingRow): Promise<void> {
+    if (booking.paymentMethod !== "WALLET" || !booking.customerId) return;
+    await this.walletService.refundBookingPayment(booking.customerId, booking.totalAmount, booking.id, booking.bookingNumber);
+    await this.notificationService.notify({
+      userId: booking.customerId,
+      eventType: "BOOKING_PAYMENT_REFUNDED_TO_WALLET",
+      data: { bookingNumber: booking.bookingNumber, amount: String(booking.totalAmount) },
     });
   }
 
@@ -778,7 +796,7 @@ export class BookingService {
       branchId: string;
       bookingType: "ONLINE" | "WALK_IN";
       bookingStatus: "PENDING" | "APPROVED";
-      paymentMethod: "ONLINE" | "PAY_AT_SALON";
+      paymentMethod: "ONLINE" | "PAY_AT_SALON" | "WALLET";
       selectedStaffId: string | null;
       scheduledStart: Date;
       scheduledEnd: Date;

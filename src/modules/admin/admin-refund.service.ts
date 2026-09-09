@@ -1,6 +1,7 @@
 import { AdminRefundRepository } from "@/modules/admin/admin-refund.repository";
 import { RequestMeta } from "@/modules/admin/admin.service";
 import { NotificationService } from "@/modules/notification/notification.service";
+import { WalletService } from "@/modules/wallet/wallet.service";
 import { AdminRefundDTO } from "@/modules/admin/admin-refund.types";
 import { ConflictError, NotFoundError } from "@/shared/errors";
 import { refunds, bookings, payments, users } from "@/db/schema";
@@ -18,7 +19,8 @@ type JoinedRow = { refund: RefundRow; booking: BookingRow; payment: PaymentRow; 
 export class AdminRefundService {
   constructor(
     private readonly repo: AdminRefundRepository = new AdminRefundRepository(),
-    private readonly notificationService: NotificationService = new NotificationService()
+    private readonly notificationService: NotificationService = new NotificationService(),
+    private readonly walletService: WalletService = new WalletService()
   ) {}
 
   async list(status?: string): Promise<AdminRefundDTO[]> {
@@ -31,7 +33,13 @@ export class AdminRefundService {
     return this.toDTO(row);
   }
 
-  /** Marks the decision only — MVP payment is pay-at-salon, there's no gateway to actually issue funds through yet. */
+  /**
+   * Module 20 — now actually moves money: approving credits the customer's wallet with the
+   * refund amount (decided with the user, replacing the old "just marks the decision, no
+   * gateway to issue funds through" behavior — MVP payment is still pay-at-salon-capable with
+   * no gateway wired for issuing real refunds, but the wallet gives this a real mechanism
+   * without needing one).
+   */
   async approve(adminUserId: string, refundId: string, notes: string | undefined, meta: RequestMeta): Promise<AdminRefundDTO> {
     const existing = await this.requireRefund(refundId);
     if (existing.refund.status !== "PENDING") {
@@ -43,6 +51,12 @@ export class AdminRefundService {
     await this.logAction(adminUserId, refundId, "REFUND", existing.refund, updated, meta, notes ?? "Refund approved");
 
     if (existing.refund.customerId) {
+      await this.walletService.creditRefundApproval(
+        existing.refund.customerId,
+        existing.refund.amount,
+        refundId,
+        existing.booking.bookingNumber
+      );
       await this.notificationService.notify({
         userId: existing.refund.customerId,
         eventType: "REFUND_APPROVED",

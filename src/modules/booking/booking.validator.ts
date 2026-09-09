@@ -19,8 +19,8 @@ export const createBookingSchema = z.object({
   slotId: slotIdSchema,
   notes: z.string().trim().max(1000).optional(),
   couponCode: z.string().trim().min(1, "couponCode cannot be empty").max(50).optional(),
-  // Module 14b — defaults to ONLINE (service-layer default) when omitted.
-  paymentMethod: z.enum(["ONLINE", "PAY_AT_SALON"]).optional(),
+  // Module 14b — defaults to ONLINE (service-layer default) when omitted. Module 20 adds WALLET.
+  paymentMethod: z.enum(["ONLINE", "PAY_AT_SALON", "WALLET"]).optional(),
 });
 
 export const bookingIdParamSchema = z.object({

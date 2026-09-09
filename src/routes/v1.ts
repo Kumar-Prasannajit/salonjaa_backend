@@ -23,6 +23,7 @@ import publicBranchRoutes from "@/modules/browse/public-branch.routes";
 import serviceCategoryRoutes from "@/modules/browse/service-category.routes";
 import promotionRoutes from "@/modules/promotion/promotion.routes";
 import publicPromotionRoutes from "@/modules/browse/promotion.routes";
+import walletRoutes from "@/modules/wallet/wallet.routes";
 
 const router = Router();
 
@@ -50,6 +51,7 @@ router.use("/public/branches", publicBranchRoutes);
 router.use("/service-categories", serviceCategoryRoutes);
 router.use("/promotions", promotionRoutes);
 router.use("/public/promotions", publicPromotionRoutes);
+router.use("/wallet", walletRoutes);
 
 // Additional module routers are mounted here as each module is implemented:
 // ...

@@ -22,8 +22,10 @@ interface AdminActionParams {
 }
 
 // Own repository, same admin-module precedent as admin-refund.*/admin-category.* — coupons
-// previously had zero writers outside npm run db:seed and Module 16's own forfeiture-coupon
-// path (BookingRepository.createForfeitureCoupon, a separate narrow insert, not this CRUD).
+// have zero writers outside npm run db:seed and this CRUD. Module 16's original
+// forfeiture-coupon mechanism (BookingRepository.createForfeitureCoupon) was replaced by a
+// wallet credit in Module 20 — see WalletService.creditForfeiture — so that separate insert
+// path no longer exists.
 export class AdminCouponRepository {
   async list() {
     return db.select().from(coupons).where(isNull(coupons.deletedAt)).orderBy(desc(coupons.createdAt));

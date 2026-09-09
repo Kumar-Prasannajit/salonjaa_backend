@@ -87,7 +87,7 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
   }),
   REFUND_APPROVED: (d) => ({
     subject: "Your Salonjaa refund was approved",
-    body: `Your refund request for booking ${d.bookingNumber} (amount ${d.amount}) has been approved.`,
+    body: `Your refund request for booking ${d.bookingNumber} (amount ${d.amount}) has been approved and credited to your Salonjaa wallet.`,
   }),
   REFUND_REJECTED: (d) => ({
     subject: "Your Salonjaa refund request was declined",
@@ -109,9 +109,13 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
     subject: "Your Salonjaa advance payment was received",
     body: `Your advance payment of ${d.amount} for booking ${d.bookingNumber} was received. The salon will review your booking shortly.`,
   }),
-  ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED: (d) => ({
-    subject: "Your advance payment was converted to a coupon",
-    body: `Your advance payment for booking ${d.bookingNumber} is non-refundable, so we've converted it into a coupon (code ${d.couponCode}, worth ${d.amount}) you can use on a future booking.`,
+  ADVANCE_PAYMENT_FORFEITED_TO_WALLET: (d) => ({
+    subject: "Your advance payment was credited to your wallet",
+    body: `Your advance payment of ${d.amount} for booking ${d.bookingNumber} is non-refundable, so we've credited it to your Salonjaa wallet instead — usable on any future booking.`,
+  }),
+  BOOKING_PAYMENT_REFUNDED_TO_WALLET: (d) => ({
+    subject: "Your booking payment was refunded to your wallet",
+    body: `Your payment of ${d.amount} for booking ${d.bookingNumber} has been refunded to your Salonjaa wallet.`,
   }),
 };
 

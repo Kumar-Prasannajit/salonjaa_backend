@@ -14,3 +14,4 @@ export * from "@/db/schema/admin";
 export * from "@/db/schema/complaint";
 export * from "@/db/schema/strike";
 export * from "@/db/schema/promotion";
+export * from "@/db/schema/wallet";

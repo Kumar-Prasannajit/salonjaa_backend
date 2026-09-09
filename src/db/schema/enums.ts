@@ -47,7 +47,11 @@ export const bookingCancellationReasonEnum = pgEnum("booking_cancellation_reason
 export const strikeTypeEnum = pgEnum("strike_type", ["FAKE_BOOKING", "NO_SHOW", "ABUSIVE_CANCELLATION"]);
 
 // Payment / coupon / settlement
-export const paymentMethodEnum = pgEnum("payment_method", ["ONLINE", "PAY_AT_SALON"]);
+// Module 20 — WALLET added. TRD §2's BRD-exclusion list originally named "wallet" as an
+// out-of-scope future feature; the LUZO-comparison plan (docs/NEXT_SESSION_PLAN.md item 4)
+// proposed building one anyway, decided with the user to build now and update the TRD's
+// exclusion list rather than leave the docs contradicting the code — see TRD.md's edit.
+export const paymentMethodEnum = pgEnum("payment_method", ["ONLINE", "PAY_AT_SALON", "WALLET"]);
 // Module 16 — distinguishes a strikes-policy advance payment (10% of a restricted customer's
 // booking, paid before the salon owner can approve it) from the normal full-amount payment.
 export const paymentPurposeEnum = pgEnum("payment_purpose", ["FULL", "ADVANCE"]);
@@ -92,4 +96,19 @@ export const adminActionTypeEnum = pgEnum("admin_action_type", [
   "REMOVE_STRIKE",
   "REFUND",
   "EDIT",
+]);
+
+// Wallet (Module 20 — see docs/PROGRESS.md and TRD.md's edited BRD-exclusion note).
+export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", ["CREDIT", "DEBIT"]);
+export const walletTransactionReasonEnum = pgEnum("wallet_transaction_reason", [
+  // Customer spent wallet balance as POST /bookings' paymentMethod: "WALLET".
+  "BOOKING_PAYMENT",
+  // That spend refunded back because the booking was cancelled/rejected/expired afterward.
+  "BOOKING_REFUND",
+  // An admin-approved refund (POST /admin/refunds/:id/approve) now credits the wallet instead
+  // of just marking the decision — see docs/PROGRESS.md's Module 20 note.
+  "REFUND_APPROVED",
+  // Replaces Module 16's forfeiture-coupon mechanism: a strikes-policy advance deposit
+  // forfeited on cancellation is now credited to the wallet instead of minting a coupon.
+  "ADVANCE_FORFEITURE",
 ]);
