@@ -1,3 +1,7 @@
+# LUZO-comparison plan — ✅ all 5 items done (Modules 20–23)
+
+Every item below shipped in one session. This file is kept as the historical record of the open questions and decisions behind each — `docs/PROGRESS.md`'s Module 20–23 entries and `docs/frontend_handover.md` are the source of truth for what's actually live. No action needed here; the "How to start next session" section at the bottom no longer applies (nothing left to pick up from this list).
+
 # Next session — the hard remaining items from the LUZO comparison
 
 Source: `docs/COMPETITOR_COMPARISON_LUZO.md`'s "Real feature work" list. The four cheap items from that doc (plus the `BOOKING_DEFAULT_EXPIRY_MINUTES` change) are done — see `docs/PROGRESS.md`'s Module 19 and the previous commit. This document is what's left: real product/schema decisions, not quick additions. **None of these are built. None have a contract yet.** Per this project's whole discipline (`CLAUDE.md`: "never build ahead of the documented contract"), the first thing next session should do for each item picked up is get the open questions below answered — not guess and build.
@@ -56,7 +60,10 @@ Built per the "Recommendation for scoping this down" below, confirmed with the u
 
 **Recommendation for scoping this down for a first pass:** wallet balance credited only by admin-approved refunds + Module 16 forfeitures; spendable as a new `paymentMethod: "WALLET"` on booking creation (reuses the exact payment-method branching `approve()` already has); no withdrawal. Confirm with the user before building — this is a real product decision, not something to default silently.
 
-## 5. "Pay bill" — pay for a visit with no prior booking
+## 5. "Pay bill" — pay for a visit with no prior booking — ✅ Done (Module 23)
+
+Built as option (a) "claim a walk-in", per the recommendation below and confirmed with the user. See `docs/PROGRESS.md`'s Module 23 entry and `docs/frontend_handover.md`'s claim-a-walk-in section for the shipped contract. **This closes out every item in this document** — see "How to start next session" below for what that means going forward.
+
 
 **Why:** the single most structural gap. LUZO's sidebar has a CTA independent of "Book Services" — a walk-in customer with zero prior booking can settle up digitally afterward. Every Salonjaa payment is anchored to a `bookingId` (`payments.booking_id NOT NULL`); `POST /salon-bookings/walk-in` exists but is staff-initiated only (`customerName`/`customerPhone` free text, no `customerId`, hardcoded `PAY_AT_SALON` — the real customer's account has no way to discover or pay it).
 

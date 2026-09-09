@@ -71,6 +71,11 @@ export const proposeRescheduleSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
+export const claimWalkInSchema = z.object({
+  bookingNumber: z.string().trim().min(1, "bookingNumber is required").max(32),
+  payOnline: z.boolean().optional(),
+});
+
 // staffId is effectively required here (decided with the user) — it's the only field in the
 // documented walk-in body that can resolve which branch the walk-in belongs to.
 export const walkInSchema = z.object({

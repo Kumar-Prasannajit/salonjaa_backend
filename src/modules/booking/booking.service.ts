@@ -457,6 +457,61 @@ export class BookingService {
   }
 
   /**
+   * Module 23 — docs/NEXT_SESSION_PLAN.md item 5, option (a) "claim a walk-in" (decided with
+   * the user). A customer who was walked in enters the bookingNumber they were given at the
+   * salon; this links it to their account, one-time. bookingType/customerId are checked (not
+   * just bookingStatus) so this can never be used to hijack someone else's ONLINE booking or
+   * re-claim an already-linked one — same "don't leak existence, don't allow surprise takeover"
+   * discipline as everywhere else. `payOnline` additionally moves an unpaid APPROVED walk-in
+   * from PAY_AT_SALON to ONLINE/AWAITING_PAYMENT so POST /payments/create-order becomes usable
+   * — this is the part that actually closes the "pay for a walk-in" gap, not just linking it
+   * into "my bookings". The stale booking-completion job scheduled at walk-in creation time is
+   * left alone rather than cancelled: it safely no-ops once bookingStatus is no longer APPROVED
+   * (see booking-completion.worker.ts), same precedent as every other delayed job here.
+   */
+  async claim(userId: string, bookingNumber: string, payOnline: boolean | undefined): Promise<BookingDTO> {
+    const booking = await this.repo.findByBookingNumber(bookingNumber);
+    if (!booking || booking.bookingType !== "WALK_IN") {
+      throw new NotFoundError("Booking not found");
+    }
+    if (booking.customerId) {
+      throw new ConflictError("This booking has already been claimed");
+    }
+
+    const claimed = await this.repo.claimBooking(booking.id, userId);
+    if (!claimed) {
+      // Lost a race to another concurrent claim on the exact same booking between the check
+      // above and the write — the DB-level guard in claimBooking caught it.
+      throw new ConflictError("This booking has already been claimed");
+    }
+
+    let finalBooking = claimed;
+    if (payOnline) {
+      if (claimed.bookingStatus !== "APPROVED") {
+        throw new ConflictError("Only an APPROVED, unpaid walk-in can switch to online payment");
+      }
+      const updated = await this.repo.transitionStatus(
+        booking.id,
+        "APPROVED",
+        "AWAITING_PAYMENT",
+        { paymentMethod: "ONLINE" },
+        userId,
+        "Claimed and switched to online payment"
+      );
+      finalBooking = updated!;
+      await schedulePaymentWindowExpiry(booking.id, env.BOOKING_PAYMENT_WINDOW_MINUTES * 60 * 1000);
+    }
+
+    await this.notificationService.notify({
+      userId,
+      eventType: "BOOKING_CLAIMED",
+      data: { bookingNumber: booking.bookingNumber },
+    });
+
+    return this.toDTO(finalBooking);
+  }
+
+  /**
    * staffId is effectively required (decided with the user) — it's the only field in the
    * documented walk-in body that can resolve which branch this walk-in belongs to.
    */

@@ -281,6 +281,12 @@ Purpose: a stored-balance wallet, funded only by admin-approved refunds and Modu
 - The booking response's `services[]` entries (from `GET /bookings/:id` etc.) now carry `variantId`/`variantName` (both `null` when no variant was involved) alongside the existing `price` (which is already the effective price — the variant's price when one was selected).
 - Owner-side variant CRUD: `GET/POST /services/:id/variants`, `PATCH/DELETE /services/:id/variants/:variantId` (owning Salon Owner). Create body `{name, price}`; update body `{name?, price?, status?: "ACTIVE"|"INACTIVE"}`.
 
-## ⚪ Not built yet — pending a decision, don't build frontend against these
+## Claim a walk-in / pay bill — 🟢 Live (Module 23, `docs/NEXT_SESSION_PLAN.md` item 5, option a)
 
-`docs/NEXT_SESSION_PLAN.md` (backend repo) lists the one remaining item identified from a competitor comparison: a "pay for a walk-in with no prior booking" flow (the general customer wallet, listing-card signals, and service variants above, previously listed here, are now `🟢 Live`). It has no contract yet — open product/schema questions need answering with the client before any endpoint exists. Don't start frontend work against a guessed shape for it; check back once `docs/NEXT_SESSION_PLAN.md`'s item moves to its own `🟢 Live` section above.
+- `POST /bookings/claim` (customer-only) — body `{bookingNumber: string, payOnline?: boolean}`. `bookingNumber` is the same customer-facing code already shown on booking detail/confirmation screens (e.g. `SLJ-...`) — a walk-in customer would have this from their salon receipt/confirmation. Links the booking to the caller's account, one-time.
+  - Success: `{success: true, data: <BookingDTO>}` (same shape `GET /bookings/:id` returns).
+  - `404` — unknown `bookingNumber`, or it belongs to a regular (non-walk-in) booking (can't be claimed this way).
+  - `409` — already claimed by someone (including a repeat call by the same customer).
+- `payOnline: true` additionally switches an unpaid, `APPROVED` walk-in from `PAY_AT_SALON` to `ONLINE` and moves it to `AWAITING_PAYMENT` — from there, **the existing** `POST /payments/create-order`/`POST /payments/verify` flow works exactly as it does for any other `AWAITING_PAYMENT` booking. No new payment endpoints. Omit `payOnline` (or pass `false`) to just link the booking into "my bookings" without touching how it gets paid — the customer can still settle up at the salon as originally planned.
+
+**All 5 items from the LUZO-comparison plan are now built** — `docs/NEXT_SESSION_PLAN.md` is fully closed out.

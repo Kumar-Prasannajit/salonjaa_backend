@@ -117,6 +117,11 @@ const TEMPLATES: Record<NotificationEventType, (data: Record<string, string>) =>
     subject: "Your booking payment was refunded to your wallet",
     body: `Your payment of ${d.amount} for booking ${d.bookingNumber} has been refunded to your Salonjaa wallet.`,
   }),
+  // Module 23 — "claim a walk-in" (docs/NEXT_SESSION_PLAN.md item 5a).
+  BOOKING_CLAIMED: (d) => ({
+    subject: "Booking linked to your account",
+    body: `Booking ${d.bookingNumber} has been linked to your account.`,
+  }),
 };
 
 export function renderNotification(eventType: NotificationEventType, data: Record<string, string>): RenderedNotification {

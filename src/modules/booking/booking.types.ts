@@ -55,6 +55,16 @@ export interface ProposeRescheduleInput {
   reason?: string;
 }
 
+// Module 23 — docs/NEXT_SESSION_PLAN.md item 5, option (a) "claim a walk-in" (decided with the
+// user over the fully-decoupled alternative). payOnline is optional: claiming alone just links
+// the booking to the customer's account (they can still pay at the salon); payOnline: true
+// additionally switches an unpaid APPROVED walk-in from PAY_AT_SALON to ONLINE and moves it to
+// AWAITING_PAYMENT so the existing POST /payments/create-order flow becomes usable.
+export interface ClaimWalkInInput {
+  bookingNumber: string;
+  payOnline?: boolean;
+}
+
 export interface WalkInInput {
   customerName: string;
   customerPhone: string;

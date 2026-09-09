@@ -80,6 +80,30 @@ export class BookingRepository {
     return db.select().from(bookingServices).where(eq(bookingServices.bookingId, bookingId));
   }
 
+  /** Module 23 — the customer-facing lookup for POST /bookings/claim. bookingNumber is already
+   * unique (bookings.booking_number), same code a walk-in customer is handed at the salon. */
+  async findByBookingNumber(bookingNumber: string) {
+    const [row] = await db.select().from(bookings).where(eq(bookings.bookingNumber, bookingNumber)).limit(1);
+    return row ?? null;
+  }
+
+  /**
+   * One-time link. The WHERE also re-checks `customerId is null` at the DB level — not just in
+   * the service beforehand — so two concurrent claim attempts on the same booking can't both
+   * succeed (same "guard the write itself, not just the read before it" precedent as
+   * WalletRepository's advisory-lock pattern, minus the lock since a single conditional UPDATE
+   * is already atomic here). Returns undefined if the booking was claimed by someone else in
+   * between the service's check and this call — the service treats that as a 409.
+   */
+  async claimBooking(bookingId: string, customerId: string) {
+    const [row] = await db
+      .update(bookings)
+      .set({ customerId, updatedAt: new Date() })
+      .where(and(eq(bookings.id, bookingId), isNull(bookings.customerId)))
+      .returning();
+    return row;
+  }
+
   /**
    * Resolves salonName/branchName/city/staffName for a batch of bookings in three bulk
    * queries (never N+1), keyed by bookingId. Used by both getDetail (a 1-element batch) and

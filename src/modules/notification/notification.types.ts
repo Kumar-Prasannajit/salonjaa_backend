@@ -37,7 +37,9 @@ export type NotificationEventType =
   // Module 20 — wallet. Replaces ADVANCE_PAYMENT_FORFEITED_COUPON_ISSUED (Module 16's original
   // forfeiture-coupon mechanism, since replaced by a wallet credit — see WalletService).
   | "ADVANCE_PAYMENT_FORFEITED_TO_WALLET"
-  | "BOOKING_PAYMENT_REFUNDED_TO_WALLET";
+  | "BOOKING_PAYMENT_REFUNDED_TO_WALLET"
+  // Module 23 — "claim a walk-in" (docs/NEXT_SESSION_PLAN.md item 5a).
+  | "BOOKING_CLAIMED";
 
 export interface NotifyInput {
   userId: string;

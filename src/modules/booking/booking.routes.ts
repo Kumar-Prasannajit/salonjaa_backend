@@ -11,6 +11,7 @@ import {
   rescheduleRequestSchema,
   rejectRescheduleSchema,
   myBookingsQuerySchema,
+  claimWalkInSchema,
 } from "@/modules/booking/booking.validator";
 import { ROLE_NAMES } from "@/shared/constants";
 
@@ -31,6 +32,16 @@ router.get(
   requireRole(ROLE_NAMES.CUSTOMER),
   validate({ query: myBookingsQuerySchema }),
   asyncHandler((req, res) => controller.myBookings(req, res))
+);
+
+// Module 23 — "claim a walk-in" (docs/NEXT_SESSION_PLAN.md item 5a). Placed before the /:id
+// routes below; not that it would collide (bookingNumber isn't a uuid, and this is POST while
+// GET /:id is the only bare param route), just grouped with the other customer-only routes.
+router.post(
+  "/claim",
+  requireRole(ROLE_NAMES.CUSTOMER),
+  validate({ body: claimWalkInSchema }),
+  asyncHandler((req, res) => controller.claim(req, res))
 );
 
 // Detail: customer owner, owning Salon Owner, or Admin — enforced in the service, not here.

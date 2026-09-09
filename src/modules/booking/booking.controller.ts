@@ -42,6 +42,12 @@ export class BookingController {
     res.status(200).json({ success: true, data: request });
   }
 
+  /** Module 23 — POST /bookings/claim, "claim a walk-in" (docs/NEXT_SESSION_PLAN.md item 5a). */
+  async claim(req: Request, res: Response): Promise<void> {
+    const booking = await bookingService.claim(req.user!.id, req.body.bookingNumber, req.body.payOnline);
+    res.status(200).json({ success: true, data: booking });
+  }
+
   // ---- Salon-owner side ----
 
   async listSalonBookings(req: Request, res: Response): Promise<void> {
