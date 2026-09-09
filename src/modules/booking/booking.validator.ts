@@ -10,10 +10,20 @@ const slotIdSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/, "Invalid slotId");
 
+// Module 22 — a bare uuid string (no variant) OR {serviceId, variantId?}. See
+// BookingServiceEntry in booking.types.ts for the full rationale.
+const serviceEntrySchema = z.union([
+  z.string().uuid("Invalid service id"),
+  z.object({
+    serviceId: z.string().uuid("Invalid service id"),
+    variantId: z.string().uuid("Invalid variant id").optional(),
+  }),
+]);
+
 export const createBookingSchema = z.object({
   salonId: z.string().uuid("Invalid salon id"),
   branchId: z.string().uuid("Invalid branch id"),
-  services: z.array(z.string().uuid("Invalid service id")).min(1, "At least one service is required"),
+  services: z.array(serviceEntrySchema).min(1, "At least one service is required"),
   staffId: z.string().uuid("Invalid staff id").optional(),
   bookingDate: dateSchema,
   slotId: slotIdSchema,
@@ -66,7 +76,7 @@ export const proposeRescheduleSchema = z.object({
 export const walkInSchema = z.object({
   customerName: z.string().trim().min(1, "customerName is required").max(200),
   customerPhone: z.string().trim().min(1, "customerPhone is required").max(20),
-  services: z.array(z.string().uuid("Invalid service id")).min(1, "At least one service is required"),
+  services: z.array(serviceEntrySchema).min(1, "At least one service is required"),
   staffId: z.string().uuid("Invalid staff id"),
   bookingDate: dateSchema,
   slotId: slotIdSchema,

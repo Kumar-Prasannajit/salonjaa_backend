@@ -253,6 +253,8 @@ export class BookingRepository {
             price: s.price,
             quantity: s.quantity,
             totalAmount: s.totalAmount,
+            variantId: s.variantId,
+            variantName: s.variantName,
           }))
         );
       }

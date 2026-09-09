@@ -6,10 +6,12 @@ import { StaffService } from "@/modules/staff/staff.service";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { StrikeService } from "@/modules/strike/strike.service";
 import { WalletService } from "@/modules/wallet/wallet.service";
+import { ServiceService } from "@/modules/service/service.service";
 import {
   ApproveBookingInput,
   BookingDTO,
   BookingNames,
+  BookingServiceEntry,
   BookingServiceLine,
   CancelBookingInput,
   CreateBookingInput,
@@ -29,7 +31,16 @@ import { schedulePaymentWindowExpiry } from "@/queues/payment-window-expiry.queu
 import { bookings } from "@/db/schema";
 
 type BookingRow = typeof bookings.$inferSelect;
-type BookingServiceRow = { serviceId: string; serviceName: string; durationMinutes: number; price: number; quantity: number; totalAmount: number };
+type BookingServiceRow = {
+  serviceId: string;
+  serviceName: string;
+  durationMinutes: number;
+  price: number;
+  quantity: number;
+  totalAmount: number;
+  variantId: string | null;
+  variantName: string | null;
+};
 
 export class BookingService {
   constructor(
@@ -40,7 +51,8 @@ export class BookingService {
     private readonly staffService: StaffService = new StaffService(),
     private readonly notificationService: NotificationService = new NotificationService(),
     private readonly strikeService: StrikeService = new StrikeService(),
-    private readonly walletService: WalletService = new WalletService()
+    private readonly walletService: WalletService = new WalletService(),
+    private readonly serviceService: ServiceService = new ServiceService()
   ) {}
 
   async create(userId: string, input: CreateBookingInput): Promise<{ bookingId: string; status: string }> {
@@ -57,9 +69,8 @@ export class BookingService {
       throw new BadRequestError("Branch is closed on this date");
     }
 
-    const { lines, totalDurationMinutes } = await this.resolveServiceLines(input.branchId, input.services);
+    const { lines, totalDurationMinutes, uniqueServiceIds } = await this.resolveServiceLines(input.branchId, input.services);
     const { start, end } = this.resolveSlot(input.bookingDate, input.slotId, totalDurationMinutes, branch);
-    const uniqueServiceIds = [...new Set(input.services)];
 
     const effectiveCapacity = await this.validateStaffAndCapacity(
       input.branchId,
@@ -464,9 +475,8 @@ export class BookingService {
       throw new BadRequestError("Branch is closed on this date");
     }
 
-    const { lines, totalDurationMinutes } = await this.resolveServiceLines(branch.id, input.services);
+    const { lines, totalDurationMinutes, uniqueServiceIds } = await this.resolveServiceLines(branch.id, input.services);
     const { start, end } = this.resolveSlot(input.bookingDate, input.slotId, totalDurationMinutes, branch);
-    const uniqueServiceIds = [...new Set(input.services)];
 
     const effectiveCapacity = await this.validateStaffAndCapacity(
       branch.id,
@@ -698,32 +708,87 @@ export class BookingService {
     return this.resolveSlot(bookingDate, slotId, booking.totalDurationMinutes, branch);
   }
 
+  /**
+   * Module 22 — accepts either a bare serviceId (no variant) or {serviceId, variantId}.
+   * A service with ≥1 active variant REQUIRES a variantId (400 if missing/invalid); a service
+   * with none rejects a stray variantId (400) rather than silently ignoring it. Price-only
+   * override, decided with the user — durationMinutes always comes from the base service.
+   * Duplicate entries (same serviceId AND same variantId) still mean quantity > 1, same
+   * semantics the old bare-string-array shape had.
+   */
   private async resolveServiceLines(
     branchId: string,
-    serviceIds: string[]
-  ): Promise<{ lines: BookingServiceLine[]; totalDurationMinutes: number }> {
-    const uniqueIds = [...new Set(serviceIds)];
-    const services = await this.availabilityRepo.findActiveServices(branchId, uniqueIds);
-    if (services.length !== uniqueIds.length) {
+    entries: BookingServiceEntry[]
+  ): Promise<{ lines: BookingServiceLine[]; totalDurationMinutes: number; uniqueServiceIds: string[] }> {
+    const normalized = entries.map((e) =>
+      typeof e === "string" ? { serviceId: e, variantId: null as string | null } : { serviceId: e.serviceId, variantId: e.variantId ?? null }
+    );
+    const uniqueServiceIds = [...new Set(normalized.map((e) => e.serviceId))];
+
+    const services = await this.availabilityRepo.findActiveServices(branchId, uniqueServiceIds);
+    if (services.length !== uniqueServiceIds.length) {
       throw new BadRequestError("One or more services are invalid, inactive, or not part of this branch");
+    }
+    const servicesById = new Map(services.map((s) => [s.id, s]));
+
+    // One bulk query for every requested service's active variants, not one per service.
+    const variantRows = await this.serviceService.listActiveVariantsForServices(uniqueServiceIds);
+    const variantsByService = new Map<string, typeof variantRows>();
+    for (const v of variantRows) {
+      const list = variantsByService.get(v.branchServiceId) ?? [];
+      list.push(v);
+      variantsByService.set(v.branchServiceId, list);
     }
 
     const counts = new Map<string, number>();
-    for (const id of serviceIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const e of normalized) {
+      const key = `${e.serviceId}:${e.variantId ?? ""}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
 
-    const lines: BookingServiceLine[] = services.map((s) => {
-      const quantity = counts.get(s.id) ?? 1;
-      return {
-        serviceId: s.id,
-        serviceName: s.name,
-        durationMinutes: s.durationMinutes,
-        price: s.basePrice,
+    const seen = new Set<string>();
+    const lines: BookingServiceLine[] = [];
+    for (const e of normalized) {
+      const key = `${e.serviceId}:${e.variantId ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const service = servicesById.get(e.serviceId)!;
+      const variantsForService = variantsByService.get(e.serviceId) ?? [];
+      let price = service.basePrice;
+      let variantId: string | null = null;
+      let variantName: string | null = null;
+
+      if (variantsForService.length > 0) {
+        if (!e.variantId) {
+          throw new BadRequestError(`"${service.name}" requires selecting a variant`);
+        }
+        const variant = variantsForService.find((v) => v.id === e.variantId);
+        if (!variant) {
+          throw new BadRequestError(`Invalid variant for "${service.name}"`);
+        }
+        price = variant.price;
+        variantId = variant.id;
+        variantName = variant.name;
+      } else if (e.variantId) {
+        throw new BadRequestError(`"${service.name}" has no variants`);
+      }
+
+      const quantity = counts.get(key) ?? 1;
+      lines.push({
+        serviceId: service.id,
+        serviceName: service.name,
+        durationMinutes: service.durationMinutes,
+        price,
         quantity,
-        totalAmount: s.basePrice * quantity,
-      };
-    });
+        totalAmount: price * quantity,
+        variantId,
+        variantName,
+      });
+    }
+
     const totalDurationMinutes = lines.reduce((sum, l) => sum + l.durationMinutes * l.quantity, 0);
-    return { lines, totalDurationMinutes };
+    return { lines, totalDurationMinutes, uniqueServiceIds };
   }
 
   private async validateStaffAndCapacity(
@@ -865,6 +930,8 @@ export class BookingService {
         price: s.price,
         quantity: s.quantity,
         totalAmount: s.totalAmount,
+        variantId: s.variantId,
+        variantName: s.variantName,
       })),
       salonName: names?.salonName ?? null,
       branchName: names?.branchName ?? null,

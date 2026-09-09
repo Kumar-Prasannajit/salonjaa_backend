@@ -40,4 +40,26 @@ export class ServiceController {
     await serviceService.removeAssignment(req.user!.id, req.params.id, req.params.staffId);
     sendNoContent(res);
   }
+
+  // ---- Module 22: service variants ----
+
+  async listVariants(req: Request, res: Response): Promise<void> {
+    const rows = await serviceService.listVariants(req.user!.id, req.params.id);
+    sendSuccess(res, rows);
+  }
+
+  async createVariant(req: Request, res: Response): Promise<void> {
+    const row = await serviceService.createVariant(req.user!.id, req.params.id, req.body);
+    sendCreated(res, row);
+  }
+
+  async updateVariant(req: Request, res: Response): Promise<void> {
+    const row = await serviceService.updateVariant(req.user!.id, req.params.id, req.params.variantId, req.body);
+    sendSuccess(res, row);
+  }
+
+  async removeVariant(req: Request, res: Response): Promise<void> {
+    await serviceService.removeVariant(req.user!.id, req.params.id, req.params.variantId);
+    sendNoContent(res);
+  }
 }

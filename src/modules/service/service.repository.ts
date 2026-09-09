@@ -1,7 +1,7 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/config/database";
-import { branchServices, staffServices, branches, salons, salonOwnerProfiles } from "@/db/schema";
-import { CreateServiceInput, UpdateServiceInput } from "@/modules/service/service.types";
+import { branchServices, staffServices, branches, salons, salonOwnerProfiles, serviceVariants } from "@/db/schema";
+import { CreateServiceInput, CreateVariantInput, UpdateServiceInput, UpdateVariantInput } from "@/modules/service/service.types";
 
 export class ServiceRepository {
   async create(input: CreateServiceInput) {
@@ -82,5 +82,66 @@ export class ServiceRepository {
     await db
       .delete(staffServices)
       .where(and(eq(staffServices.staffId, staffId), eq(staffServices.serviceId, serviceId)));
+  }
+
+  // ---- Module 22: service variants ----
+
+  async listVariants(branchServiceId: string) {
+    return db
+      .select()
+      .from(serviceVariants)
+      .where(and(eq(serviceVariants.branchServiceId, branchServiceId), isNull(serviceVariants.deletedAt)));
+  }
+
+  async findVariant(branchServiceId: string, variantId: string) {
+    const [row] = await db
+      .select()
+      .from(serviceVariants)
+      .where(
+        and(eq(serviceVariants.id, variantId), eq(serviceVariants.branchServiceId, branchServiceId), isNull(serviceVariants.deletedAt))
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  async createVariant(branchServiceId: string, input: CreateVariantInput) {
+    const [row] = await db
+      .insert(serviceVariants)
+      .values({ branchServiceId, name: input.name, price: input.price })
+      .returning();
+    return row;
+  }
+
+  async updateVariant(variantId: string, input: UpdateVariantInput) {
+    const [row] = await db
+      .update(serviceVariants)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(serviceVariants.id, variantId))
+      .returning();
+    return row;
+  }
+
+  async softDeleteVariant(variantId: string): Promise<void> {
+    await db.update(serviceVariants).set({ deletedAt: new Date() }).where(eq(serviceVariants.id, variantId));
+  }
+
+  /**
+   * Bulk lookup used by BookingService.resolveServiceLines — every ACTIVE variant across a set
+   * of services in one query (same N+1-avoidance precedent as AvailabilityRepository's own
+   * bulk findActiveServices), so it can both validate a chosen variantId and detect which
+   * services require one (have ≥1 active variant) but got none.
+   */
+  async listActiveVariantsForServices(branchServiceIds: string[]) {
+    if (branchServiceIds.length === 0) return [];
+    return db
+      .select()
+      .from(serviceVariants)
+      .where(
+        and(
+          inArray(serviceVariants.branchServiceId, branchServiceIds),
+          eq(serviceVariants.status, "ACTIVE"),
+          isNull(serviceVariants.deletedAt)
+        )
+      );
   }
 }

@@ -59,6 +59,38 @@ export const branchServices = pgTable(
   })
 );
 
+// Module 22 — docs/NEXT_SESSION_PLAN.md item 1. A single-select, required-when-present variant
+// on a service (e.g. Facial — Papaya ₹999 / Diamond ₹1499), decided with the user: overrides
+// price only, never duration (same durationMinutes as the base service for every variant).
+// A service "has variants" iff it has ≥1 active variant row here — no separate
+// hasVariants/variantRequired flag on branch_services, avoiding an invalid combination of
+// flag-without-variants or variants-without-the-flag (see BookingService.resolveServiceLines,
+// which enforces variantId as required exactly when this is true).
+export const serviceVariants = pgTable(
+  "service_variants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    branchServiceId: uuid("branch_service_id")
+      .notNull()
+      .references(() => branchServices.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    price: doublePrecision("price").notNull(),
+    // Same status/soft-delete shape as branch_services above, not the plain boolean
+    // branch_slot_templates uses — a variant is closer to "a small service" than a template.
+    status: serviceStatusEnum("status").notNull().default("ACTIVE"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => ({
+    serviceStatusIdx: index("service_variants_service_status_deleted_idx").on(
+      table.branchServiceId,
+      table.status,
+      table.deletedAt
+    ),
+  })
+);
+
 export const staffServices = pgTable(
   "staff_services",
   {

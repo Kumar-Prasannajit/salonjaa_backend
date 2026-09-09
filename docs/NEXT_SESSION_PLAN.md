@@ -4,7 +4,10 @@ Source: `docs/COMPETITOR_COMPARISON_LUZO.md`'s "Real feature work" list. The fou
 
 Priority order below is a suggestion, not a mandate — ask which the user wants first.
 
-## 1. Service variants / customisation
+## 1. Service variants / customisation — ✅ Done (Module 22)
+
+Built per the decisions below (price-only override, required single-select). See `docs/PROGRESS.md`'s Module 22 entry and `docs/frontend_handover.md`'s service-variants section (⚠️ changes the `POST /bookings` `services` array shape) for the shipped contract.
+
 
 **Why:** LUZO requires a single-select variant (e.g. Facial — Papaya ₹999 / Diamond ₹1499) before a customisable service can be added to cart. Salonjaa's `branch_services` is flat (`name`, `durationMinutes`, `basePrice`) — a salon offering priced variants today has to model each as a wholly separate service, which pollutes the menu.
 

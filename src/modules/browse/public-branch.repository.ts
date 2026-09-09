@@ -1,6 +1,6 @@
 import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/config/database";
-import { branches, salons, branchServices, serviceCategories, reviews } from "@/db/schema";
+import { branches, salons, branchServices, serviceCategories, serviceVariants, reviews } from "@/db/schema";
 
 export interface BranchSearchFilters {
   city?: string;
@@ -95,6 +95,30 @@ export class PublicBranchRepository {
       .innerJoin(serviceCategories, eq(branchServices.categoryId, serviceCategories.id))
       .where(
         and(eq(branchServices.branchId, branchId), eq(branchServices.status, "ACTIVE"), isNull(branchServices.deletedAt))
+      );
+  }
+
+  /**
+   * Module 22 — bulk-fetches every ACTIVE variant across a set of services in one query (same
+   * N+1-avoidance precedent as getRatingAggregates), so the customer sees exactly what
+   * POST /bookings will require them to pick from for a variant-required service.
+   */
+  async findActiveVariantsForServices(branchServiceIds: string[]) {
+    if (branchServiceIds.length === 0) return [];
+    return db
+      .select({
+        branchServiceId: serviceVariants.branchServiceId,
+        id: serviceVariants.id,
+        name: serviceVariants.name,
+        price: serviceVariants.price,
+      })
+      .from(serviceVariants)
+      .where(
+        and(
+          inArray(serviceVariants.branchServiceId, branchServiceIds),
+          eq(serviceVariants.status, "ACTIVE"),
+          isNull(serviceVariants.deletedAt)
+        )
       );
   }
 

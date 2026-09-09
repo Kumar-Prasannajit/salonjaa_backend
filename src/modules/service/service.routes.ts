@@ -11,6 +11,9 @@ import {
   serviceStaffParamSchema,
   serviceListQuerySchema,
   assignStaffSchema,
+  createVariantSchema,
+  updateVariantSchema,
+  serviceVariantParamSchema,
 } from "@/modules/service/service.validator";
 import { ROLE_NAMES } from "@/shared/constants";
 
@@ -46,6 +49,29 @@ router.delete(
   "/:id/staff/:staffId",
   validate({ params: serviceStaffParamSchema }),
   asyncHandler((req, res) => controller.removeAssignment(req, res))
+);
+
+// ---- Module 22: service variants ----
+
+router.get(
+  "/:id/variants",
+  validate({ params: serviceIdParamSchema }),
+  asyncHandler((req, res) => controller.listVariants(req, res))
+);
+router.post(
+  "/:id/variants",
+  validate({ params: serviceIdParamSchema, body: createVariantSchema }),
+  asyncHandler((req, res) => controller.createVariant(req, res))
+);
+router.patch(
+  "/:id/variants/:variantId",
+  validate({ params: serviceVariantParamSchema, body: updateVariantSchema }),
+  asyncHandler((req, res) => controller.updateVariant(req, res))
+);
+router.delete(
+  "/:id/variants/:variantId",
+  validate({ params: serviceVariantParamSchema }),
+  asyncHandler((req, res) => controller.removeVariant(req, res))
 );
 
 export default router;

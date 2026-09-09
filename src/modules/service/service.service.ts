@@ -1,5 +1,12 @@
 import { ServiceRepository } from "@/modules/service/service.repository";
-import { CreateServiceInput, ServiceDTO, UpdateServiceInput } from "@/modules/service/service.types";
+import {
+  CreateServiceInput,
+  CreateVariantInput,
+  ServiceDTO,
+  ServiceVariantDTO,
+  UpdateServiceInput,
+  UpdateVariantInput,
+} from "@/modules/service/service.types";
 import { BranchService } from "@/modules/branch/branch.service";
 import { StaffService } from "@/modules/staff/staff.service";
 import { ConflictError, NotFoundError } from "@/shared/errors";
@@ -67,6 +74,49 @@ export class ServiceService {
       throw new NotFoundError("Assignment not found");
     }
     await this.repo.removeAssignment(staffId, serviceId);
+  }
+
+  // ---- Module 22: service variants ----
+
+  async listVariants(userId: string, serviceId: string): Promise<ServiceVariantDTO[]> {
+    await this.assertOwned(userId, serviceId);
+    const rows = await this.repo.listVariants(serviceId);
+    return rows.map((r) => this.toVariantDTO(r));
+  }
+
+  async createVariant(userId: string, serviceId: string, input: CreateVariantInput): Promise<ServiceVariantDTO> {
+    await this.assertOwned(userId, serviceId);
+    const row = await this.repo.createVariant(serviceId, input);
+    return this.toVariantDTO(row);
+  }
+
+  async updateVariant(userId: string, serviceId: string, variantId: string, input: UpdateVariantInput): Promise<ServiceVariantDTO> {
+    await this.assertOwned(userId, serviceId);
+    const existing = await this.repo.findVariant(serviceId, variantId);
+    if (!existing) {
+      throw new NotFoundError("Variant not found");
+    }
+    const updated = await this.repo.updateVariant(variantId, input);
+    return this.toVariantDTO(updated);
+  }
+
+  async removeVariant(userId: string, serviceId: string, variantId: string): Promise<void> {
+    await this.assertOwned(userId, serviceId);
+    const existing = await this.repo.findVariant(serviceId, variantId);
+    if (!existing) {
+      throw new NotFoundError("Variant not found");
+    }
+    await this.repo.softDeleteVariant(variantId);
+  }
+
+  /** Bulk pass-through for BookingService.resolveServiceLines — see
+   * ServiceRepository.listActiveVariantsForServices for why this is bulk, not per-service. */
+  async listActiveVariantsForServices(branchServiceIds: string[]) {
+    return this.repo.listActiveVariantsForServices(branchServiceIds);
+  }
+
+  private toVariantDTO(row: { id: string; branchServiceId: string; name: string; price: number; status: string }): ServiceVariantDTO {
+    return { id: row.id, branchServiceId: row.branchServiceId, name: row.name, price: row.price, status: row.status };
   }
 
   /** Made public (Module 16) so Promotion can verify a target serviceId belongs to the

@@ -84,13 +84,24 @@ export class PublicBranchService {
     }
     const { branch, salon } = row;
 
-    const [services, ratings, gallery, averagePrices] = await Promise.all([
+    const [rawServices, ratings, gallery, averagePrices] = await Promise.all([
       this.repo.findActiveServicesWithCategory(branchId),
       this.repo.getRatingAggregates([branchId]),
       this.salonService.listGallery(salon.id),
       this.repo.getAveragePrices([branchId]),
     ]);
     const rating = ratings.get(branchId);
+
+    // Module 22 — bulk-fetch every active service's variants in one extra query, not one per
+    // service (same N+1-avoidance precedent as ratings/prices above).
+    const variantRows = await this.repo.findActiveVariantsForServices(rawServices.map((s) => s.id));
+    const variantsByService = new Map<string, { id: string; name: string; price: number }[]>();
+    for (const v of variantRows) {
+      const list = variantsByService.get(v.branchServiceId) ?? [];
+      list.push({ id: v.id, name: v.name, price: v.price });
+      variantsByService.set(v.branchServiceId, list);
+    }
+    const services = rawServices.map((s) => ({ ...s, variants: variantsByService.get(s.id) ?? [] }));
 
     return {
       branchId: branch.id,

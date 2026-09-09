@@ -26,3 +26,25 @@ export interface ServiceDTO {
   imageUrl: string | null;
   status: string;
 }
+
+// Module 22 — docs/NEXT_SESSION_PLAN.md item 1. Price-only override (decided with the user);
+// duration always matches the base service. Owner CRUD under /services/:id/variants, same
+// sub-resource pattern as staff assignment above.
+export interface CreateVariantInput {
+  name: string;
+  price: number;
+}
+
+export interface UpdateVariantInput {
+  name?: string;
+  price?: number;
+  status?: "ACTIVE" | "INACTIVE";
+}
+
+export interface ServiceVariantDTO {
+  id: string;
+  branchServiceId: string;
+  name: string;
+  price: number;
+  status: string;
+}

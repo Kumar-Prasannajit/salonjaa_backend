@@ -270,6 +270,17 @@ Purpose: a stored-balance wallet, funded only by admin-approved refunds and Modu
   - `activePromotion: { title, bannerImageUrl } | null` — **listing card only** (not on the detail response, which already has the full list via `GET /public/promotions?branchId=`). Only shows when the owner has explicitly flagged one of the branch's active, in-range promotions as `featured` — a branch with active promotions but none flagged featured shows `null`, not an automatic pick.
 - `POST /promotions`/`PATCH /promotions/:id` (owner) gain an optional `featured: boolean` field (default false) — surfaced back in the promotion object too.
 
+## Service variants — 🟢 Live (Module 22, `docs/NEXT_SESSION_PLAN.md` item 1)
+
+**⚠️ Changes the shape of `POST /bookings`'s (and `POST /salon-bookings/walk-in`'s) `services` array** — the one contract-breaking part of this module, flagged per the plan doc's own callout.
+
+- `GET /public/branches/:branchId`'s each service object gains `variants: [{id, name, price}]` — empty array means no variants (book it directly with `basePrice`, exactly as before). A non-empty array means variant selection is **required**.
+- `services` array entries now accept **either** shape: a bare `serviceId` string (unchanged — valid for a service with no variants, or if you genuinely mean "no variant"), **or** `{serviceId, variantId}` (required whenever that service's `variants` array from the branch detail response is non-empty). Mixing both shapes in one request is fine. Duplicate identical entries still mean quantity > 1, same as before.
+- A variant overrides **price only** — duration is always the base service's `durationMinutes`, never the variant's.
+- Errors: `400` if a variant-required service's entry omits `variantId` or supplies one that doesn't belong to that service/isn't active; `400` if `variantId` is supplied for a service that has none.
+- The booking response's `services[]` entries (from `GET /bookings/:id` etc.) now carry `variantId`/`variantName` (both `null` when no variant was involved) alongside the existing `price` (which is already the effective price — the variant's price when one was selected).
+- Owner-side variant CRUD: `GET/POST /services/:id/variants`, `PATCH/DELETE /services/:id/variants/:variantId` (owning Salon Owner). Create body `{name, price}`; update body `{name?, price?, status?: "ACTIVE"|"INACTIVE"}`.
+
 ## ⚪ Not built yet — pending a decision, don't build frontend against these
 
-`docs/NEXT_SESSION_PLAN.md` (backend repo) lists the remaining items identified from a competitor comparison: service variants/customisation, and a "pay for a walk-in with no prior booking" flow (the general customer wallet and the listing-card signals above, previously listed here, are now `🟢 Live`). **Neither remaining item has a contract yet** — each has open product/schema questions that need answering with the client before any endpoint exists. Don't start frontend work against guessed shapes for these; check back once `docs/NEXT_SESSION_PLAN.md`'s items move to their own `🟢 Live` sections above.
+`docs/NEXT_SESSION_PLAN.md` (backend repo) lists the one remaining item identified from a competitor comparison: a "pay for a walk-in with no prior booking" flow (the general customer wallet, listing-card signals, and service variants above, previously listed here, are now `🟢 Live`). It has no contract yet — open product/schema questions need answering with the client before any endpoint exists. Don't start frontend work against a guessed shape for it; check back once `docs/NEXT_SESSION_PLAN.md`'s item moves to its own `🟢 Live` section above.

@@ -11,7 +11,7 @@ import { branches } from "@/db/schema/branch";
 import { staff } from "@/db/schema/staff";
 import { salons } from "@/db/schema/salon";
 import { users } from "@/db/schema/identity";
-import { branchServices } from "@/db/schema/service";
+import { branchServices, serviceVariants } from "@/db/schema/service";
 
 // TRD §4 `bookings` table. Module 5 (Availability) migrated a minimal slice of this table
 // (branchId, selectedStaffId, scheduledStart/End, bookingStatus, timestamps) before Booking
@@ -100,9 +100,19 @@ export const bookingServices = pgTable(
       .references(() => branchServices.id, { onDelete: "restrict" }),
     serviceName: varchar("service_name", { length: 200 }).notNull(),
     durationMinutes: integer("duration_minutes").notNull(),
+    // Module 22 — the effective price actually charged: the selected variant's price when
+    // variantId is set, the base service's basePrice otherwise. Same "price" column as before
+    // this module, no separate variantPrice column (the plan doc's "or is variant choice
+    // folded into the price already snapshotted" alternative — chosen since price is the ONLY
+    // thing a variant overrides, per the user, so a separate column would just duplicate it).
     price: doublePrecision("price").notNull(),
     quantity: integer("quantity").notNull().default(1),
     totalAmount: doublePrecision("total_amount").notNull(),
+    // Module 22 — nullable immutable snapshot, same reasoning as serviceName/price: a variant
+    // renamed or deleted later must never rewrite this booking's history. onDelete "restrict"
+    // matches serviceId below — a variant can never be hard-deleted once used in a booking.
+    variantId: uuid("variant_id").references(() => serviceVariants.id, { onDelete: "restrict" }),
+    variantName: varchar("variant_name", { length: 200 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({

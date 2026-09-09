@@ -45,6 +45,17 @@ export interface PublicBranchServiceDTO {
   durationMinutes: number;
   basePrice: number;
   imageUrl: string | null;
+  // Module 22 — docs/NEXT_SESSION_PLAN.md item 1. Empty array for a service with no variants
+  // (book it directly with basePrice, as before). Non-empty means variant selection is
+  // REQUIRED — POST /bookings' services entry for this serviceId must carry a variantId from
+  // this list (see docs/frontend_handover.md's service-variants section for the full contract).
+  variants: PublicServiceVariantDTO[];
+}
+
+export interface PublicServiceVariantDTO {
+  id: string;
+  name: string;
+  price: number;
 }
 
 export interface PublicBranchDetailDTO {

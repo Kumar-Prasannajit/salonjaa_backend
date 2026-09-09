@@ -1,7 +1,15 @@
+// Module 22 — docs/NEXT_SESSION_PLAN.md item 1. A bare string stays valid (no variant — the
+// service either has none, or the caller means "book the base service" for one with none).
+// A duplicate entry (same serviceId AND same variantId) still means quantity > 1 for that
+// exact line, same semantics as the old bare-string-array shape. This is the one part of the
+// existing contract that changes shape, flagged in docs/frontend_handover.md's variants
+// section per CLAUDE.md's "flag contract changes clearly" note in NEXT_SESSION_PLAN.md.
+export type BookingServiceEntry = string | { serviceId: string; variantId?: string };
+
 export interface CreateBookingInput {
   salonId: string;
   branchId: string;
-  services: string[]; // service IDs; duplicates mean quantity > 1 for that service
+  services: BookingServiceEntry[];
   staffId?: string;
   bookingDate: string; // YYYY-MM-DD
   slotId: string; // "HH:MM-HH:MM"
@@ -50,7 +58,7 @@ export interface ProposeRescheduleInput {
 export interface WalkInInput {
   customerName: string;
   customerPhone: string;
-  services: string[];
+  services: BookingServiceEntry[];
   staffId: string;
   bookingDate: string;
   slotId: string;
@@ -63,6 +71,10 @@ export interface BookingServiceLine {
   price: number;
   quantity: number;
   totalAmount: number;
+  // Module 22 — null when the line has no variant (service has none, or none was selected
+  // because none exist to select).
+  variantId: string | null;
+  variantName: string | null;
 }
 
 export interface BookingDTO {
