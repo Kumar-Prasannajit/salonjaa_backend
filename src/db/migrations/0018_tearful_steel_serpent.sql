@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "payments_active_booking_purpose_unique" ON "payments" USING btree ("booking_id","purpose") WHERE "payments"."status" <> 'FAILED';

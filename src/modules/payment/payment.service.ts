@@ -70,17 +70,31 @@ export class PaymentService {
 
     const order = await paymentProvider.createOrder(booking.totalAmount, "INR", booking.id);
 
-    const payment = await this.repo.createPayment({
-      bookingId: booking.id,
-      customerId: userId,
-      method: "ONLINE",
-      purpose: "FULL",
-      provider: "RAZORPAY",
-      providerOrderId: order.orderId,
-      amount: booking.totalAmount,
-      currency: "INR",
-      status: "PENDING",
-    });
+    // The check above isn't race-safe by itself — two concurrent requests can both pass it
+    // before either inserts. payments_active_booking_purpose_unique (a partial unique index on
+    // bookingId+purpose for any non-FAILED payment, see db/schema/payment.ts) is the real
+    // guard: it makes the loser's insert fail atomically instead of both succeeding, same
+    // "guard the write itself, not just the read before it" precedent as
+    // BookingRepository.claimBooking.
+    let payment: Awaited<ReturnType<PaymentRepository["createPayment"]>>;
+    try {
+      payment = await this.repo.createPayment({
+        bookingId: booking.id,
+        customerId: userId,
+        method: "ONLINE",
+        purpose: "FULL",
+        provider: "RAZORPAY",
+        providerOrderId: order.orderId,
+        amount: booking.totalAmount,
+        currency: "INR",
+        status: "PENDING",
+      });
+    } catch (err) {
+      if (this.isUniqueViolation(err)) {
+        throw new ConflictError("A payment already exists for this booking");
+      }
+      throw err;
+    }
 
     await this.repo.createTransaction({
       paymentId: payment.id,
@@ -122,17 +136,27 @@ export class PaymentService {
 
     const order = await paymentProvider.createOrder(booking.advanceAmount, "INR", booking.id);
 
-    const payment = await this.repo.createPayment({
-      bookingId: booking.id,
-      customerId: userId,
-      method: "ONLINE",
-      purpose: "ADVANCE",
-      provider: "RAZORPAY",
-      providerOrderId: order.orderId,
-      amount: booking.advanceAmount,
-      currency: "INR",
-      status: "PENDING",
-    });
+    // Same race as createOrder() above, guarded by the same
+    // payments_active_booking_purpose_unique index — see the comment there.
+    let payment: Awaited<ReturnType<PaymentRepository["createPayment"]>>;
+    try {
+      payment = await this.repo.createPayment({
+        bookingId: booking.id,
+        customerId: userId,
+        method: "ONLINE",
+        purpose: "ADVANCE",
+        provider: "RAZORPAY",
+        providerOrderId: order.orderId,
+        amount: booking.advanceAmount,
+        currency: "INR",
+        status: "PENDING",
+      });
+    } catch (err) {
+      if (this.isUniqueViolation(err)) {
+        throw new ConflictError("An advance payment already exists for this booking");
+      }
+      throw err;
+    }
 
     await this.repo.createTransaction({
       paymentId: payment.id,
@@ -330,6 +354,10 @@ export class PaymentService {
     assertCouponEligible(coupon, input.bookingAmount, customerId);
     const discount = computeCouponDiscount(coupon, input.bookingAmount);
     return { valid: true, discount };
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
   }
 
   private toPaymentDTO(payment: PaymentRow): PaymentDTO {

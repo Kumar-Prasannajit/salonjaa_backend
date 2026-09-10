@@ -127,6 +127,13 @@
       "when": 1788975806611,
       "tag": "0017_flippant_human_fly",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789073675365,
+      "tag": "0018_tearful_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

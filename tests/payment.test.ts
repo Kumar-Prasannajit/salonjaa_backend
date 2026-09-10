@@ -107,4 +107,22 @@ describe("Payment — create-order gating + real Razorpay signature verification
     const bookingRes = await request(app).get(`/api/v1/bookings/${bookingId}`).set(authHeader(customer.accessToken));
     expect(bookingRes.body.booking.bookingStatus).toBe("APPROVED");
   });
+
+  it("two concurrent create-order requests for the same booking only let one through (payments_active_booking_purpose_unique)", async () => {
+    const { customer, bookingId } = await createAwaitingPaymentBooking();
+
+    const [first, second] = await Promise.all([
+      request(app).post("/api/v1/payments/create-order").set(authHeader(customer.accessToken)).send({ bookingId }),
+      request(app).post("/api/v1/payments/create-order").set(authHeader(customer.accessToken)).send({ bookingId }),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const myPayments = await request(app).get("/api/v1/payments/my-payments").set(authHeader(customer.accessToken));
+    const pendingForBooking = myPayments.body.data.filter(
+      (p: { bookingId: string; status: string }) => p.bookingId === bookingId && p.status === "PENDING"
+    );
+    expect(pendingForBooking).toHaveLength(1);
+  });
 });

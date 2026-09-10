@@ -111,4 +111,25 @@ describe("Module 23 — claim a walk-in / pay bill (LUZO comparison item 5a)", (
       .send({ bookingId: walkIn.id });
     expect(order.status).toBe(201);
   });
+
+  it("a claimed walk-in no longer shows the original walk-in intake name/phone on the owner side", async () => {
+    const fixture = await createBookableBranch();
+    const walkIn = await createWalkIn(fixture);
+    const customer = await createTestUser([ROLE_NAMES.CUSTOMER]);
+
+    await request(app)
+      .post("/api/v1/bookings/claim")
+      .set(authHeader(customer.accessToken))
+      .send({ bookingNumber: walkIn.bookingNumber });
+
+    const ownerView = await request(app)
+      .get("/api/v1/salon-bookings?status=APPROVED")
+      .set(authHeader(fixture.owner.accessToken));
+    expect(ownerView.status).toBe(200);
+    const claimed = ownerView.body.data.find((b: { id: string }) => b.id === walkIn.id);
+    expect(claimed).toBeTruthy();
+    expect(claimed.customerId).toBe(customer.id);
+    expect(claimed.customerName).toBeNull();
+    expect(claimed.customerPhone).toBeNull();
+  });
 });

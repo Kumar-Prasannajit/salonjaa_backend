@@ -139,10 +139,11 @@ export class ReviewService {
   }
 
   private async toDTOList(rows: ReviewRow[]): Promise<ReviewDTO[]> {
+    const repliesByReview = await this.repo.listRepliesForReviews(rows.map((r) => r.id));
     return Promise.all(
       rows.map(async (row) => {
         const ratings = await this.repo.findCategoryRatings(row.id);
-        return this.toDTO(row, ratings);
+        return this.toDTO(row, ratings, repliesByReview.get(row.id));
       })
     );
   }

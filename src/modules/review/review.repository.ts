@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/config/database";
 import { reviews, reviewCategoryRatings, reviewResponses, reviewReports, bookings, bookingServices } from "@/db/schema";
 
@@ -128,6 +128,26 @@ export class ReviewRepository {
       .from(reviewResponses)
       .where(eq(reviewResponses.reviewId, reviewId))
       .orderBy(desc(reviewResponses.createdAt));
+  }
+
+  /**
+   * Bulk counterpart to listReplies() for list endpoints (listBySalon/listByStaff/
+   * listByService) — one query keyed by reviewId instead of N+1, same pattern as
+   * BookingRepository.findNamesForBookings. Only the latest reply per review is kept (rows
+   * arrive newest-first), matching getDetail()'s replies[0] behavior.
+   */
+  async listRepliesForReviews(reviewIds: string[]) {
+    const map = new Map<string, typeof reviewResponses.$inferSelect>();
+    if (reviewIds.length === 0) return map;
+    const rows = await db
+      .select()
+      .from(reviewResponses)
+      .where(inArray(reviewResponses.reviewId, reviewIds))
+      .orderBy(desc(reviewResponses.createdAt));
+    for (const row of rows) {
+      if (!map.has(row.reviewId)) map.set(row.reviewId, row);
+    }
+    return map;
   }
 
   async createReply(reviewId: string, respondedBy: string, text: string) {

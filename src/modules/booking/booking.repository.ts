@@ -94,11 +94,18 @@ export class BookingRepository {
    * WalletRepository's advisory-lock pattern, minus the lock since a single conditional UPDATE
    * is already atomic here). Returns undefined if the booking was claimed by someone else in
    * between the service's check and this call — the service treats that as a 409.
+   *
+   * customerName/customerPhone are nulled out at the same time: those two columns are only ever
+   * the original walk-in intake placeholder, and once a real account is linked via customerId
+   * there's no reason to keep displaying the placeholder over it. This is also the only signal
+   * the owner side has that a walk-in is no longer anonymous — BookingDTO has no separate
+   * claimedAt/claimedBy field — and the frontend's owner-booking-card already falls back to
+   * "Registered customer" when customerName is null (see PROGRESS.md's Module 23 entry).
    */
   async claimBooking(bookingId: string, customerId: string) {
     const [row] = await db
       .update(bookings)
-      .set({ customerId, updatedAt: new Date() })
+      .set({ customerId, customerName: null, customerPhone: null, updatedAt: new Date() })
       .where(and(eq(bookings.id, bookingId), isNull(bookings.customerId)))
       .returning();
     return row;

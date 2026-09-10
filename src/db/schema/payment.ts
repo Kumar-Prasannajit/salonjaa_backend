@@ -53,6 +53,15 @@ export const payments = pgTable(
     providerPaymentIdUnique: uniqueIndex("payments_provider_payment_id_unique")
       .on(table.providerPaymentId)
       .where(sql`${table.providerPaymentId} is not null`),
+    // Mirrors PaymentRepository.findActivePaymentForBooking's "PENDING or SUCCESS reserves this
+    // booking" rule as a DB-level constraint, not just an application-level check — closes the
+    // race where two concurrent POST /payments/create-order requests for the same booking both
+    // pass the check before either has inserted, and both succeed. FAILED payments are excluded
+    // so a booking can still be retried after a failed/expired attempt (see
+    // PaymentService.cancelPendingPayment / the payment-expiry job).
+    activePaymentPerBookingUnique: uniqueIndex("payments_active_booking_purpose_unique")
+      .on(table.bookingId, table.purpose)
+      .where(sql`${table.status} <> 'FAILED'`),
     bookingStatusIdx: index("payments_booking_status_idx").on(table.bookingId, table.status),
     customerCreatedIdx: index("payments_customer_created_idx").on(table.customerId, table.createdAt),
   })
