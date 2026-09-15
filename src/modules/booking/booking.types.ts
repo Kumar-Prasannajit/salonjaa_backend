@@ -128,6 +128,13 @@ export interface BookingDTO {
   staffName: string | null;
   // Closes docs/COMPETITOR_COMPARISON_LUZO.md's "Call Salon" gap.
   branchPhone: string | null;
+  // BUG-009 fix — the booking's own latest PENDING reschedule request, if any, so owner and
+  // customer list/detail views can show a badge and freeze Approve/Reject/Reschedule without a
+  // second lookup. null when no proposal is pending. Only the read endpoints (getDetail,
+  // listMyBookings, listMyBookingHistory, listSalonBookings) populate this — mutation-response
+  // DTOs (approve/reject/walk-in/etc.) leave it null, same "reads only" precedent as
+  // salonName/branchName/etc. above.
+  pendingReschedule: RescheduleRequestDTO | null;
 }
 
 /** Denormalized names resolved for one booking, keyed by bookingId when resolving in bulk. */

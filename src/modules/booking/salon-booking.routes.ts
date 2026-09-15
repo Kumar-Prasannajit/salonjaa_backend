@@ -55,6 +55,14 @@ router.post(
   asyncHandler((req, res) => controller.markNoShow(req, res))
 );
 
+// BUG-007 fix — same "no documented contract, follow the no-show precedent" reasoning as
+// above: owner marks an APPROVED booking complete manually, any time at/after scheduledStart.
+router.post(
+  "/:id/complete",
+  validate({ params: bookingIdParamSchema }),
+  asyncHandler((req, res) => controller.markComplete(req, res))
+);
+
 // POST /salon-bookings/:id/block-slot is explicitly "Future Feature — Not MVP" in
 // frontend_handover.md — deliberately not implemented.
 

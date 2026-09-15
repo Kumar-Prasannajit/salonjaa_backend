@@ -28,9 +28,10 @@ import { env } from "@/config/env";
 import { scheduleBookingExpiry } from "@/queues/booking-expiry.queue";
 import { scheduleBookingCompletion, rescheduleBookingCompletion } from "@/queues/booking-completion.queue";
 import { schedulePaymentWindowExpiry } from "@/queues/payment-window-expiry.queue";
-import { bookings } from "@/db/schema";
+import { bookings, bookingRescheduleRequests } from "@/db/schema";
 
 type BookingRow = typeof bookings.$inferSelect;
+type RescheduleRequestRow = typeof bookingRescheduleRequests.$inferSelect;
 type BookingServiceRow = {
   serviceId: string;
   serviceName: string;
@@ -141,13 +142,15 @@ export class BookingService {
     }
     const services = await this.repo.findServicesForBooking(bookingId);
     const names = await this.repo.findNamesForBookings([booking]);
-    return this.toDTO(booking, services, names.get(booking.id));
+    const pendingReschedules = await this.repo.findPendingRescheduleForBookings([booking.id]);
+    return this.toDTO(booking, services, names.get(booking.id), pendingReschedules.get(booking.id));
   }
 
   async listMyBookings(userId: string, status?: string): Promise<BookingDTO[]> {
     const rows = await this.repo.listByCustomer(userId, status);
     const names = await this.repo.findNamesForBookings(rows);
-    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
+    const pendingReschedules = await this.repo.findPendingRescheduleForBookings(rows.map((r) => r.id));
+    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id), pendingReschedules.get(r.id)));
   }
 
   /**
@@ -161,7 +164,8 @@ export class BookingService {
     const statusFilter = status === "UPCOMING" ? [...CAPACITY_CONSUMING_BOOKING_STATUSES] : status;
     const rows = await this.repo.listByCustomer(userId, statusFilter);
     const names = await this.repo.findNamesForBookings(rows);
-    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
+    const pendingReschedules = await this.repo.findPendingRescheduleForBookings(rows.map((r) => r.id));
+    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id), pendingReschedules.get(r.id)));
   }
 
   async listSalonBookings(userId: string, status?: string): Promise<BookingDTO[]> {
@@ -171,7 +175,8 @@ export class BookingService {
       status
     );
     const names = await this.repo.findNamesForBookings(rows);
-    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id)));
+    const pendingReschedules = await this.repo.findPendingRescheduleForBookings(rows.map((r) => r.id));
+    return rows.map((r) => this.toDTO(r, undefined, names.get(r.id), pendingReschedules.get(r.id)));
   }
 
   /**
@@ -232,6 +237,13 @@ export class BookingService {
     }
     if (!this.isCapacityConsuming(booking.bookingStatus)) {
       throw new ConflictError("Only a pending or approved booking can be rescheduled");
+    }
+
+    // BUG-009 fix — mirrors the same guard on proposeReschedule (owner side): without this, a
+    // customer-initiated request while a salon-initiated one is still pending would orphan the
+    // salon's proposal (only the latest PENDING row is ever resolvable).
+    if (await this.repo.findLatestPendingRescheduleRequest(bookingId)) {
+      throw new ConflictError("A reschedule proposal is already pending on this booking");
     }
 
     const { start, end } = await this.resolveNewTimeForBooking(booking, input.bookingDate, input.slotId);
@@ -335,6 +347,13 @@ export class BookingService {
       throw new ConflictError("Only a pending booking can be approved");
     }
 
+    // BUG-010 fix — a reschedule proposal (either direction) still pending on this booking
+    // must be resolved by the customer first; approving at the original time would silently
+    // ignore a proposal that may exist precisely because that original time has a conflict.
+    if (await this.repo.findLatestPendingRescheduleRequest(bookingId)) {
+      throw new ConflictError("A reschedule proposal is pending on this booking — resolve it before approving");
+    }
+
     // Module 16 — a restricted customer's advance deposit must clear before the owner can
     // even approve, not just before payment: it's the whole point of requiring it upfront.
     if (booking.requiresAdvancePayment) {
@@ -401,6 +420,13 @@ export class BookingService {
     if (booking.bookingStatus !== "PENDING") {
       throw new ConflictError("Only a pending booking can be rejected");
     }
+
+    // BUG-010 fix — same guard as approve(): don't let the owner resolve the booking out from
+    // under a still-pending reschedule proposal.
+    if (await this.repo.findLatestPendingRescheduleRequest(bookingId)) {
+      throw new ConflictError("A reschedule proposal is pending on this booking — resolve it before rejecting");
+    }
+
     const updated = await this.repo.transitionStatus(
       bookingId,
       booking.bookingStatus,
@@ -431,6 +457,12 @@ export class BookingService {
     const booking = await this.assertOwnedBooking(userId, bookingId);
     if (!this.isCapacityConsuming(booking.bookingStatus)) {
       throw new ConflictError("Only a pending or approved booking can be rescheduled");
+    }
+
+    // BUG-009 fix — the booking is frozen for owner action (including re-proposing) while a
+    // proposal is already pending, so the owner can't stack duplicate/conflicting proposals.
+    if (await this.repo.findLatestPendingRescheduleRequest(bookingId)) {
+      throw new ConflictError("A reschedule proposal is already pending on this booking");
     }
 
     const { start, end } = await this.resolveNewTimeForBooking(booking, input.bookingDate, input.slotId);
@@ -601,6 +633,44 @@ export class BookingService {
       await this.notificationService.notify({
         userId: booking.customerId,
         eventType: "BOOKING_NO_SHOW",
+        data: { bookingNumber: booking.bookingNumber },
+      });
+    }
+
+    return this.toDTO(updated);
+  }
+
+  /**
+   * BUG-007 fix — no endpoint anywhere let an APPROVED booking reach COMPLETED except the
+   * time-based `booking.complete` job (Module 8), which only fires once `scheduledEnd` actually
+   * passes. Real check-in never got a contract (context.md's Pending Decisions: "API contracts
+   * for ... booking check-in actions" — the OTP idea in the same doc's booking-rules section
+   * was never built, per Module 6's own note), so this follows the exact precedent already set
+   * for NO_SHOW just above: owner marks it manually, any time at/after scheduledStart, no OTP.
+   * Safe alongside the existing auto-completion job — its worker re-checks bookingStatus ===
+   * "APPROVED" before acting, so it no-ops once this has already moved the booking on.
+   */
+  async markComplete(userId: string, bookingId: string): Promise<BookingDTO> {
+    const booking = await this.assertOwnedBooking(userId, bookingId);
+    if (booking.bookingStatus !== "APPROVED") {
+      throw new ConflictError("Only an approved booking can be marked complete");
+    }
+    if (booking.scheduledStart.getTime() > Date.now()) {
+      throw new BadRequestError("Cannot mark complete before the scheduled start time");
+    }
+
+    const updated = await this.repo.transitionStatus(
+      bookingId,
+      booking.bookingStatus,
+      "COMPLETED",
+      { completedAt: new Date() },
+      userId
+    );
+
+    if (booking.customerId) {
+      await this.notificationService.notify({
+        userId: booking.customerId,
+        eventType: "BOOKING_COMPLETED",
         data: { bookingNumber: booking.bookingNumber },
       });
     }
@@ -946,7 +1016,12 @@ export class BookingService {
     return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
   }
 
-  private toDTO(booking: BookingRow, services?: BookingServiceRow[], names?: BookingNames): BookingDTO {
+  private toDTO(
+    booking: BookingRow,
+    services?: BookingServiceRow[],
+    names?: BookingNames,
+    pendingReschedule?: RescheduleRequestRow | null
+  ): BookingDTO {
     return {
       id: booking.id,
       bookingNumber: booking.bookingNumber,
@@ -993,6 +1068,7 @@ export class BookingService {
       city: names?.city ?? null,
       staffName: names?.staffName ?? null,
       branchPhone: names?.branchPhone ?? null,
+      pendingReschedule: pendingReschedule ? this.toRescheduleDTO(pendingReschedule) : null,
     };
   }
 

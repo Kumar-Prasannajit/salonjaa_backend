@@ -386,6 +386,30 @@ export class BookingRepository {
     return row ?? null;
   }
 
+  /**
+   * Bug fix (BUG-009) — batch version of findLatestPendingRescheduleRequest, same "one query"
+   * precedent as findNamesForBookings, so list endpoints can surface a pending proposal without
+   * N+1 queries. At most one PENDING row per booking in practice, but ordered + deduped by
+   * bookingId defensively in case that ever changes.
+   */
+  async findPendingRescheduleForBookings(bookingIds: string[]) {
+    const result = new Map<string, typeof bookingRescheduleRequests.$inferSelect>();
+    if (bookingIds.length === 0) {
+      return result;
+    }
+    const rows = await db
+      .select()
+      .from(bookingRescheduleRequests)
+      .where(and(inArray(bookingRescheduleRequests.bookingId, bookingIds), eq(bookingRescheduleRequests.status, "PENDING")))
+      .orderBy(desc(bookingRescheduleRequests.createdAt));
+    for (const row of rows) {
+      if (!result.has(row.bookingId)) {
+        result.set(row.bookingId, row);
+      }
+    }
+    return result;
+  }
+
   async resolveRescheduleRequest(requestId: string, status: "ACCEPTED" | "REJECTED", responseReason?: string) {
     const [row] = await db
       .update(bookingRescheduleRequests)

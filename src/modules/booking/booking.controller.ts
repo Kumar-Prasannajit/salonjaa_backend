@@ -80,4 +80,10 @@ export class BookingController {
     const booking = await bookingService.markNoShow(req.user!.id, req.params.id);
     res.status(200).json({ success: true, data: booking });
   }
+
+  /** BUG-007 fix — see BookingService.markComplete for why this exists. */
+  async markComplete(req: Request, res: Response): Promise<void> {
+    const booking = await bookingService.markComplete(req.user!.id, req.params.id);
+    res.status(200).json({ success: true, data: booking });
+  }
 }
