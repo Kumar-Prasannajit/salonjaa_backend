@@ -12,9 +12,20 @@ import {
   staffServices,
   serviceCategories,
   branchServices,
+  serviceVariants,
   bookings,
   bookingServices,
   reviews,
+  payments,
+  paymentTransactions,
+  refunds,
+  refundHistory,
+  couponUsages,
+  bookingCoupons,
+  settlementBookings,
+  settlements,
+  customerStrikes,
+  salonGalleryImages,
 } from "@/db/schema";
 import { logger } from "@/shared/logger";
 
@@ -43,6 +54,14 @@ const DEMO_CUSTOMER_EMAIL = "demo.customer@salonjaa.dev";
 // Coordinates are approximate real Hyderabad neighborhood centers (public
 // geography, not fabricated business data) — close enough for distance-sort
 // testing.
+// Cover/gallery are Unsplash stock photos (dummy demo imagery, not the real
+// salons' actual photos) — chosen and eyeballed one by one for genuine salon
+// relevance (interiors, styling/color/threading/makeup in progress) rather
+// than random placeholder art, since these render directly on SalonCard
+// (components/salon-card.tsx) and the salon detail page's hero image. Same
+// "URL string, frontend hosts the file elsewhere" mechanism a real owner
+// already uses via SalonGalleryCard — this just fills in what an onboarded
+// owner would have uploaded themselves.
 const SALON_BLUEPRINTS = [
   {
     salonName: "The Luxe Salon",
@@ -53,6 +72,11 @@ const SALON_BLUEPRINTS = [
     description: "Experience luxury & perfection with our expert stylists and premium services.",
     targetAverage: 4.8,
     reviewCount: 12,
+    coverImage: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1470259078422-826894b933aa?w=1200&q=80",
+      "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=1200&q=80",
+    ],
   },
   {
     salonName: "Looks Studio",
@@ -63,6 +87,11 @@ const SALON_BLUEPRINTS = [
     description: "A modern studio for hair, skin, and grooming — Jubilee Hills' go-to for a quick refresh.",
     targetAverage: 4.6,
     reviewCount: 10,
+    coverImage: "https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1519415387722-a1c3bbef716c?w=1200&q=80",
+      "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=1200&q=80",
+    ],
   },
   {
     salonName: "Headquarters",
@@ -73,6 +102,11 @@ const SALON_BLUEPRINTS = [
     description: "Unisex salon known for precision cuts and a relaxed, no-rush atmosphere.",
     targetAverage: 4.5,
     reviewCount: 8,
+    coverImage: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=1200&q=80",
+      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1200&q=80",
+    ],
   },
   {
     salonName: "Style Hub",
@@ -83,6 +117,11 @@ const SALON_BLUEPRINTS = [
     description: "Style Hub brings salon-grade color and styling to Madhapur's tech crowd.",
     targetAverage: 4.4,
     reviewCount: 6,
+    coverImage: "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=1200&q=80",
+      "https://images.unsplash.com/photo-1470259078422-826894b933aa?w=1200&q=80",
+    ],
   },
   {
     salonName: "Cut & Style",
@@ -93,6 +132,11 @@ const SALON_BLUEPRINTS = [
     description: "Neighborhood favorite for haircuts, beard styling, and quick spa treatments.",
     targetAverage: 4.3,
     reviewCount: 5,
+    coverImage: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1200&q=80",
+      "https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=1200&q=80",
+    ],
   },
 ];
 
@@ -105,6 +149,17 @@ const SERVICE_BLUEPRINTS = [
   { categorySlug: "hair-coloring", name: "Hair Color", durationMinutes: 90, basePrice: 1499 },
   { categorySlug: "grooming-men", name: "Beard Styling", durationMinutes: 30, basePrice: 299 },
   { categorySlug: "spa-massage", name: "Smoothening", durationMinutes: 120, basePrice: 2499 },
+];
+
+// BUG-004 fix — "Hair Color" had no variant options, so the customer-facing
+// variant picker (app/salons/[branchId]/services/page.tsx) never had
+// anything to expand. Names/pricing modeled on the color-shade options
+// described in luzo.txt's competitor walkthrough.
+const HAIR_COLOR_VARIANTS = [
+  { name: "Papaya Fruit", price: 1499 },
+  { name: "Wine Red Grape", price: 1799 },
+  { name: "Diamond Grey", price: 2199 },
+  { name: "Kesar Gold", price: 2499 },
 ];
 
 const STAFF_NAMES = [
@@ -149,6 +204,24 @@ async function deleteSalonIfExists(salonName: string): Promise<void> {
     const bookingRows = await db.select({ id: bookings.id }).from(bookings).where(inArray(bookings.branchId, branchIds));
     const bookingIds = bookingRows.map((b) => b.id);
     if (bookingIds.length > 0) {
+      // Module 23 (claim walk-in / pay bill) added payments/refunds against bookings with
+      // `onDelete: restrict` — any demo booking touched by manual/E2E payment testing now has
+      // rows here, so these must go before the bookings themselves or the delete below 23001s.
+      const refundRows = await db.select({ id: refunds.id }).from(refunds).where(inArray(refunds.bookingId, bookingIds));
+      const refundIds = refundRows.map((r) => r.id);
+      if (refundIds.length > 0) await db.delete(refundHistory).where(inArray(refundHistory.refundId, refundIds));
+      await db.delete(refunds).where(inArray(refunds.bookingId, bookingIds));
+
+      const paymentRows = await db.select({ id: payments.id }).from(payments).where(inArray(payments.bookingId, bookingIds));
+      const paymentIds = paymentRows.map((p) => p.id);
+      if (paymentIds.length > 0) await db.delete(paymentTransactions).where(inArray(paymentTransactions.paymentId, paymentIds));
+      await db.delete(payments).where(inArray(payments.bookingId, bookingIds));
+
+      await db.delete(couponUsages).where(inArray(couponUsages.bookingId, bookingIds));
+      await db.delete(bookingCoupons).where(inArray(bookingCoupons.bookingId, bookingIds));
+      await db.delete(settlementBookings).where(inArray(settlementBookings.bookingId, bookingIds));
+      await db.delete(customerStrikes).where(inArray(customerStrikes.bookingId, bookingIds));
+
       await db.delete(reviews).where(inArray(reviews.bookingId, bookingIds));
       await db.delete(bookingServices).where(inArray(bookingServices.bookingId, bookingIds));
       await db.delete(bookings).where(inArray(bookings.id, bookingIds));
@@ -157,6 +230,11 @@ async function deleteSalonIfExists(salonName: string): Promise<void> {
     await db.delete(staff).where(inArray(staff.branchId, branchIds));
     await db.delete(branches).where(inArray(branches.id, branchIds));
   }
+  // settlements.salonId is `restrict` (settlementBookings-referenced bookings are already
+  // cleared above by bookingId) — an Admin-created settlement against this demo salon (e.g. from
+  // manual QA) otherwise blocks the salon delete below. Cascades to any of its own
+  // settlementBookings rows automatically (onDelete: cascade on settlementId).
+  await db.delete(settlements).where(eq(settlements.salonId, existing.id));
   await db.delete(salons).where(eq(salons.id, existing.id));
 }
 
@@ -211,10 +289,15 @@ async function run(): Promise<void> {
         ownerProfileId: ownerProfile.id,
         name: blueprint.salonName,
         description: blueprint.description,
+        coverImage: blueprint.coverImage,
         status: "ACTIVE",
         verificationStatus: "VERIFIED",
       })
       .returning();
+
+    await db.insert(salonGalleryImages).values(
+      blueprint.gallery.map((imageUrl, i) => ({ salonId: salon.id, imageUrl, displayOrder: i }))
+    );
 
     const [branch] = await db
       .insert(branches)
@@ -253,6 +336,13 @@ async function run(): Promise<void> {
         }))
       )
       .returning();
+
+    const hairColorService = serviceRows.find((s) => s.name === "Hair Color");
+    if (hairColorService) {
+      await db.insert(serviceVariants).values(
+        HAIR_COLOR_VARIANTS.map((v) => ({ branchServiceId: hairColorService.id, name: v.name, price: v.price }))
+      );
+    }
 
     // Every demo staff member is assigned to every service at their branch —
     // GET /availability/staff's eligibility query (findEligibleStaff) only
