@@ -166,4 +166,26 @@ export class PublicBranchRepository {
     for (const r of rows) map.set(r.branchId, r.average);
     return map;
   }
+
+  /**
+   * Real "Starting ₹X" figure for listing/detail cards — the cheapest active
+   * service's basePrice per branch, not the averagePrices bucket above (which
+   * only ever feeds the ₹/₹₹/₹₹₹ tier). A branch with zero active services is
+   * simply absent from the map, same precedent as getAveragePrices.
+   */
+  async getStartingPrices(branchIds: string[]): Promise<Map<string, number>> {
+    if (branchIds.length === 0) return new Map();
+    const rows = await db
+      .select({
+        branchId: branchServices.branchId,
+        min: sql<number>`min(${branchServices.basePrice})`.mapWith(Number),
+      })
+      .from(branchServices)
+      .where(and(inArray(branchServices.branchId, branchIds), eq(branchServices.status, "ACTIVE"), isNull(branchServices.deletedAt)))
+      .groupBy(branchServices.branchId);
+
+    const map = new Map<string, number>();
+    for (const r of rows) map.set(r.branchId, r.min);
+    return map;
+  }
 }

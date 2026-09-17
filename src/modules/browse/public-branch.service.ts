@@ -30,9 +30,10 @@ export class PublicBranchService {
       salonId: query.salonId,
     });
     const branchIds = rows.map((r) => r.branch.id);
-    const [ratings, averagePrices, featuredPromotions] = await Promise.all([
+    const [ratings, averagePrices, startingPrices, featuredPromotions] = await Promise.all([
       this.repo.getRatingAggregates(branchIds),
       this.repo.getAveragePrices(branchIds),
+      this.repo.getStartingPrices(branchIds),
       this.promotionRepo.findFeaturedActiveByBranchIds(branchIds),
     ]);
 
@@ -54,6 +55,7 @@ export class PublicBranchService {
         averageRating: rating?.average ?? null,
         reviewCount: rating?.count ?? 0,
         priceTier: computePriceTier(averagePrices.get(branch.id)),
+        startingPrice: startingPrices.get(branch.id) ?? null,
         genderServed: branch.genderServed,
         activePromotion: featuredPromotions.get(branch.id) ?? null,
       };
@@ -84,11 +86,12 @@ export class PublicBranchService {
     }
     const { branch, salon } = row;
 
-    const [rawServices, ratings, gallery, averagePrices] = await Promise.all([
+    const [rawServices, ratings, gallery, averagePrices, startingPrices] = await Promise.all([
       this.repo.findActiveServicesWithCategory(branchId),
       this.repo.getRatingAggregates([branchId]),
       this.salonService.listGallery(salon.id),
       this.repo.getAveragePrices([branchId]),
+      this.repo.getStartingPrices([branchId]),
     ]);
     const rating = ratings.get(branchId);
 
@@ -124,6 +127,7 @@ export class PublicBranchService {
       closingTime: branch.closingTime,
       services,
       priceTier: computePriceTier(averagePrices.get(branchId)),
+      startingPrice: startingPrices.get(branchId) ?? null,
       genderServed: branch.genderServed,
     };
   }

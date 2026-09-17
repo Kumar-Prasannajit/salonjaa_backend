@@ -14,7 +14,7 @@ export interface CreateBranchInput {
   openingTime: string;
   closingTime: string;
   // Module 21 — optional, defaults to UNISEX at the DB level when omitted.
-  genderServed?: "UNISEX" | "MEN" | "WOMEN";
+  genderServed?: "UNISEX" | "MEN" | "WOMEN" | "KIDS";
 }
 
 export type UpdateBranchInput = Partial<Omit<CreateBranchInput, "salonId">>;

@@ -18,7 +18,7 @@ export const createBranchSchema = z
     totalChairs: z.number().int().positive("totalChairs must be > 0"),
     openingTime: timeSchema,
     closingTime: timeSchema,
-    genderServed: z.enum(["UNISEX", "MEN", "WOMEN"]).optional(),
+    genderServed: z.enum(["UNISEX", "MEN", "WOMEN", "KIDS"]).optional(),
   })
   .refine((data) => data.openingTime < data.closingTime, {
     message: "openingTime must be before closingTime",
@@ -40,7 +40,7 @@ export const updateBranchSchema = z
     totalChairs: z.number().int().positive().optional(),
     openingTime: timeSchema.optional(),
     closingTime: timeSchema.optional(),
-    genderServed: z.enum(["UNISEX", "MEN", "WOMEN"]).optional(),
+    genderServed: z.enum(["UNISEX", "MEN", "WOMEN", "KIDS"]).optional(),
   })
   .refine((data) => !data.openingTime || !data.closingTime || data.openingTime < data.closingTime, {
     message: "openingTime must be before closingTime",

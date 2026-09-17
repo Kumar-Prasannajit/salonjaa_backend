@@ -29,6 +29,9 @@ export interface PublicBranchListItemDTO {
   // Module 21 — docs/NEXT_SESSION_PLAN.md item 2. null when the branch has no active services
   // to average (nothing to bucket). genderServed always has a value (DB default UNISEX).
   priceTier: "₹" | "₹₹" | "₹₹₹" | null;
+  // Real "Starting ₹X" figure — the cheapest active service's basePrice. null under the same
+  // condition as priceTier (zero active services to compute over).
+  startingPrice: number | null;
   genderServed: string;
   // Module 22 — docs/NEXT_SESSION_PLAN.md item 3. Only a currently-active, in-range,
   // owner-`featured` promotion targeting this branch is ever surfaced here; null otherwise
@@ -82,5 +85,6 @@ export interface PublicBranchDetailDTO {
   services: PublicBranchServiceDTO[];
   // Module 21 — same fields/semantics as the listing card (PublicBranchListItemDTO above).
   priceTier: "₹" | "₹₹" | "₹₹₹" | null;
+  startingPrice: number | null;
   genderServed: string;
 }

@@ -26,6 +26,8 @@ import {
   settlements,
   customerStrikes,
   salonGalleryImages,
+  promotions,
+  promotionBranches,
 } from "@/db/schema";
 import { logger } from "@/shared/logger";
 
@@ -72,6 +74,7 @@ const SALON_BLUEPRINTS = [
     description: "Experience luxury & perfection with our expert stylists and premium services.",
     targetAverage: 4.8,
     reviewCount: 12,
+    genderServed: "WOMEN" as const,
     coverImage: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&q=80",
     gallery: [
       "https://images.unsplash.com/photo-1470259078422-826894b933aa?w=1200&q=80",
@@ -132,11 +135,50 @@ const SALON_BLUEPRINTS = [
     description: "Neighborhood favorite for haircuts, beard styling, and quick spa treatments.",
     targetAverage: 4.3,
     reviewCount: 5,
+    genderServed: "MEN" as const,
     coverImage: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=1200&q=80",
     gallery: [
       "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1200&q=80",
       "https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=1200&q=80",
     ],
+  },
+  {
+    salonName: "Little Wonders Kids Salon",
+    branchName: "Little Wonders Kids Salon",
+    area: "Gachibowli",
+    lat: 17.4401,
+    lng: 78.3489,
+    description: "A playful, patient-friendly salon just for kids — first haircuts to birthday styling.",
+    targetAverage: 4.7,
+    reviewCount: 7,
+    genderServed: "KIDS" as const,
+    coverImage: "https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1476234251651-f353703a034d?w=1200&q=80",
+      "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=1200&q=80",
+    ],
+  },
+];
+
+// Site-wide homepage banners (GET /public/promotions with no branchId — see
+// promotion.repository.ts's listActive) — real marketing copy an owner would
+// write for their own salon, not a fabricated discount percentage. startsAt/
+// endsAt are computed at seed time (see below) so they're always "currently
+// active, in-range" regardless of when this script runs.
+const PROMOTION_BLUEPRINTS = [
+  {
+    salonName: "The Luxe Salon",
+    title: "Festive Glow Rituals",
+    description: "Book a Hair Color or Hair Spa this month and get a complimentary consultation with our senior stylists.",
+    bannerImageUrl: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=1600&q=80",
+    featured: true,
+  },
+  {
+    salonName: "Little Wonders Kids Salon",
+    title: "First Haircut Keepsake",
+    description: "Bringing your little one in for their very first haircut? We'll box a lock of hair and print a certificate to take home.",
+    bannerImageUrl: "https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=1600&q=80",
+    featured: true,
   },
 ];
 
@@ -279,6 +321,7 @@ async function run(): Promise<void> {
   }
 
   let created = 0;
+  const branchIdByName = new Map<string, string>();
 
   for (const blueprint of SALON_BLUEPRINTS) {
     await deleteSalonIfExists(blueprint.salonName);
@@ -316,6 +359,7 @@ async function run(): Promise<void> {
         openingTime: "09:00",
         closingTime: "21:00",
         status: "ACTIVE",
+        genderServed: "genderServed" in blueprint ? blueprint.genderServed : "UNISEX",
       })
       .returning();
 
@@ -406,8 +450,33 @@ async function run(): Promise<void> {
       });
     }
 
+    branchIdByName.set(blueprint.salonName, branch.id);
     created++;
     logger.info({ salon: blueprint.salonName, branchId: branch.id }, "Demo salon created");
+  }
+
+  // Promotions cascade-delete via their FK to salons/branches (onDelete:
+  // cascade on both promotion_branches.promotionId and .branchId), so
+  // deleteSalonIfExists above already cleared out any from a previous run —
+  // just re-insert against the fresh salon/branch rows.
+  for (const promo of PROMOTION_BLUEPRINTS) {
+    const branchId = branchIdByName.get(promo.salonName);
+    if (!branchId) continue;
+    const now = Date.now();
+    const [row] = await db
+      .insert(promotions)
+      .values({
+        createdByUserId: owner.id,
+        title: promo.title,
+        description: promo.description,
+        bannerImageUrl: promo.bannerImageUrl,
+        startsAt: new Date(now - 7 * 24 * 60 * 60 * 1000),
+        endsAt: new Date(now + 30 * 24 * 60 * 60 * 1000),
+        active: true,
+        featured: promo.featured,
+      })
+      .returning();
+    await db.insert(promotionBranches).values({ promotionId: row.id, branchId });
   }
 
   logger.info({ created }, "Demo browse data seeding complete");
